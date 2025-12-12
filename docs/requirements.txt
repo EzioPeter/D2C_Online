@@ -6,7 +6,7 @@ pandas
 sphinx<4
 sphinxcontrib-bibtex
 tensorboard
-torch
+torch==2.4.0
 tqdm
 protobuf~=3.19.0
 Jinja2<3.1
