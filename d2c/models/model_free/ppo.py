@@ -102,6 +102,16 @@ class PPOAgent(BaseAgent):
 
         return modules
     
+    def _build_agent(self) -> None:
+        """Builds agent components."""
+        self._init_vars()
+        self._build_fns()
+        self._build_optimizers()
+        self._global_step = 0
+        self._train_info = collections.OrderedDict()
+        self._test_policies = collections.OrderedDict()
+        self._build_test_policies()
+
     def _build_fns(self) -> None:
         self._agent_module = AgentModule(modules=self._modules)
         self._q_fns = self._agent_module.q_nets
@@ -113,6 +123,8 @@ class PPOAgent(BaseAgent):
         self._batch_size = int(self._num_envs * self._num_steps)
         self._mini_batch_size = int(self._batch_size // self._num_minibatches)
         self._num_iterations = self._total_timesteps // self._batch_size
+        self._observation_space = self._env._env.single_observation_space
+        self._action_space = self._env._env.single_action_space
         self._train_data = onpolicytransitions.OnPolicyTransitions( 
             num_steps=self._num_steps,
             num_envs=self._num_envs,
@@ -135,6 +147,9 @@ class PPOAgent(BaseAgent):
             lr=opts.q[1],
             weight_decay=self._weight_decays,
         )
+        # temporarily align cleanrl
+        self._p_optimizer.param_groups[0]['eps']=1e-5
+        self._q_optimizer.param_groups[0]['eps']=1e-5
 
     def _build_q_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
         states = batch['s1']
@@ -206,8 +221,8 @@ class PPOAgent(BaseAgent):
         for _ in range(self._num_steps):
             with torch.no_grad():
                 self._traj_steps = 0
-                # self._current_state = self._env.reset(seed=self._env_seed) # use it for debug
-                self._current_state = self._env.reset()
+                self._current_state = self._env.reset(seed=self._env_seed) # use it for debug
+                # self._current_state = self._env.reset()
                 for _ in trange(self._rollout_sim_num):
                     self._traj_steps += 1
                     state = self._current_state

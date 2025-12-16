@@ -47,7 +47,7 @@ def main(args: Args):
         'model.model_name': 'ppo',
         'train.data_loader_name': None,
         'train.device': device,
-        'train.seed': seed,
+        'train.seed': 42,
         'train.total_train_steps': 1000000,
         'train.batch_size': 256,
         'train.agent_ckpt_name': '1211'
