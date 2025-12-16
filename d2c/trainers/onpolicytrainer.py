@@ -41,12 +41,12 @@ class OnPolicyTrainer(BaseTrainer):
     ) -> None:
         super(OnPolicyTrainer, self).__init__(agent, env, train_data, config)
         self._train_steps = self._train_cfg.total_train_steps
-        self._summary_freq = self._train_cfg.summary_freq
-        self._print_freq = self._train_cfg.print_freq
-        self._save_freq = self._train_cfg.save_freq
+        self._summary_freq = self._train_cfg.on_policy_summary_freq
+        self._print_freq = self._train_cfg.on_policy_print_freq
+        self._save_freq = self._train_cfg.on_policy_save_freq
         self._agent_name = self._model_cfg.model.model_name
         self._evaluator = evaluator
-        self._eval_freq = self._train_cfg.eval_freq
+        self._eval_freq = self._train_cfg.on_policy_eval_freq
 
     def train(self) -> None:
         _custom_train = self._build_train_schedule()
@@ -72,26 +72,27 @@ class OnPolicyTrainer(BaseTrainer):
         wandb_logger = self._build_wandb_logger(dir_=train_summary_dir)
 
         time_st_total = time.time()
-        step = self._agent.global_step
-        while step < self._train_steps:
-            self._agent.train_step()
-            step = self._agent.global_step
-            if step % self._summary_freq == 0 or step == self._train_steps:
+        epoch = 0
+        total_iterations = self._train_steps // self._agent._batch_size
+        while epoch < total_iterations:
+            # self._agent.train_step()
+            epoch = epoch + 1
+            if epoch % self._summary_freq == 0 or epoch == self._train_steps:
                 self._agent.write_train_summary(train_summary_writer)
-            if step % self._print_freq == 0 or step == self._train_steps:
+            if epoch % self._print_freq == 0 or epoch == self._train_steps:
                 self._agent.print_train_info()
-            if step % self._eval_freq == 0 or step == self._train_steps:
+            if epoch % self._eval_freq == 0 or epoch == self._train_steps:
                 if self._evaluator is not None:
                     try:
-                        eval_info = self._evaluator.eval(step)
+                        eval_info = self._evaluator.eval(epoch)
                     except:
                         logging.info('Something wrong when evaluating the policy!')
                     else:
-                        eval_info.update(global_step=step)
+                        eval_info.update(global_step=epoch)
                         wandb_logger.write_summary(eval_info)
-                    if step == self._train_steps:
+                    if epoch == self._train_steps:
                         self._evaluator.save_eval_results()
-            if step % self._save_freq == 0:
+            if epoch % self._save_freq == 0:
                 self._agent.save(agent_ckpt_dir)
                 logging.info(f'Agent saved at {agent_ckpt_dir}.')
         self._agent.save(agent_ckpt_dir)
