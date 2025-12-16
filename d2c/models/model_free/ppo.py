@@ -120,6 +120,8 @@ class PPOAgent(BaseAgent):
             action_shape=self._action_space.shape,
             device=self._device,
         )
+        self._current_iteration = 0
+        self._total_iterations = 0
 
     def _build_optimizers(self) -> None:
         opts = self._optimizers
@@ -188,14 +190,20 @@ class PPOAgent(BaseAgent):
         info['log_pi'] = log_pi.detach().mean()
         return p_loss, info
 
-    def _get_train_batch(self) -> Dict:
-        if self._global_step % self._rollout_sim_freq == 0:
-            if self._anneal_lr:
-                frac = 1.0 - (self._global_step - 1.0) / self._total_timesteps
-                lrnow = frac * self._optimizers.p[1]
-                self._p_optimizer.param_groups[0]['lr'] = lrnow
-                self._q_optimizer.param_groups[0]['lr'] = lrnow
+    def train_step(self) -> None:
+        if self._anneal_lr:
+            frac = 1.0 - (self._current_iteration - 1.0) / self._total_iterations
+            lrnow = frac * self._optimizers.p[1]
+            self._p_optimizer.param_groups[0]['lr'] = lrnow
+            self._q_optimizer.param_groups[0]['lr'] = lrnow
 
+        train_batch = self._get_train_batch()
+        info = self._optimize_step(train_batch)
+        for key, val in info.items():
+            self._train_info[key] = val.item()
+
+    def _get_train_batch(self) -> Dict:
+        for _ in range(self._num_steps):
             with torch.no_grad():
                 self._traj_steps = 0
                 # self._current_state = self._env.reset(seed=self._env_seed) # use it for debug
