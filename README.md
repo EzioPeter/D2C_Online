@@ -18,14 +18,6 @@ The current supported offline RL/IL algorithms include (**more to come**):
 - [Discriminator-Guided Model-Based Offline Imitation Learning (DMIL)](https://arxiv.org/abs/2207.00244)
 - [Behavior Cloning (BC)](http://www.cse.unsw.edu.au/~claude/papers/MI15.pdf)
 
-## Important Notes:
-**13/07/2025**: 
-
-Don't use too high version numpy. For example, numpy == 1.24.4 would face the bug of **ValueError: setting an array element with a sequence. The requested array has an inhomogeneous shape after 2 dimensions. The detected shape was (100, 7) + inhomogeneous part.**
-
-Please use a low version numpy, such as numpy == 1.23.1.
-
-And try to align the settings in **requirements.txt**.
 
 ## Features:
 
