@@ -7,6 +7,7 @@ multiple timesteps and parallel environments.
 
 import torch
 import numpy as np
+from collections import OrderedDict
 from typing import Tuple, Union, Optional
 
 
@@ -55,8 +56,8 @@ class OnPolicyTransitions:
         self,
         num_steps: int,
         num_envs: int,
-        obs_shape: Tuple[int, ...],
-        action_shape: Tuple[int, ...],
+        obs_shape: Union[Tuple[int, ...], int],
+        action_shape: Union[Tuple[int, ...], int],
         device: Union[str, torch.device] = "cpu",
     ):
         """Initialize on-policy storage buffers.
@@ -70,13 +71,21 @@ class OnPolicyTransitions:
         """
         self.num_steps = num_steps
         self.num_envs = num_envs
-        self.obs_shape = obs_shape
-        self.action_shape = action_shape
+        # normalize shapes to tuple form so callers may pass int or tuple
+        if isinstance(obs_shape, int):
+            self.obs_shape = (obs_shape,)
+        else:
+            self.obs_shape = tuple(obs_shape)
+
+        if isinstance(action_shape, int):
+            self.action_shape = (action_shape,)
+        else:
+            self.action_shape = tuple(action_shape)
         self.device = device
 
         # Initialize storage buffers
-        self.obs = torch.zeros((num_steps, num_envs) + obs_shape, dtype=torch.float32, device=device)
-        self.actions = torch.zeros((num_steps, num_envs) + action_shape, dtype=torch.float32, device=device)
+        self.obs = torch.zeros((num_steps, num_envs) + self.obs_shape, dtype=torch.float32, device=device)
+        self.actions = torch.zeros((num_steps, num_envs) + self.action_shape, dtype=torch.float32, device=device)
         self.logprobs = torch.zeros((num_steps, num_envs), dtype=torch.float32, device=device)
         self.rewards = torch.zeros((num_steps, num_envs), dtype=torch.float32, device=device)
         self.dones = torch.zeros((num_steps, num_envs), dtype=torch.float32, device=device)
@@ -154,14 +163,44 @@ class OnPolicyTransitions:
         Returns:
             Dictionary with keys: 'obs', 'actions', 'logprobs', 'rewards', 'dones', 'values'.
         """
-        return {
-            'obs': self.get_flat_obs(),
-            'actions': self.get_flat_actions(),
-            'logprobs': self.get_flat_logprobs(),
-            'rewards': self.get_flat_rewards(),
-            'dones': self.get_flat_dones(),
-            'values': self.get_flat_values(),
-        }
+        flat_obs = self.get_flat_obs()
+        flat_actions = self.get_flat_actions()
+        flat_logprobs = self.get_flat_logprobs()
+        flat_rewards = self.get_flat_rewards()
+        flat_dones = self.get_flat_dones()
+        flat_values = self.get_flat_values()
+
+        # compute next observations (s2) by shifting in time; last step repeats last obs
+        if self.num_steps > 1:
+            next_obs = torch.zeros_like(self.obs)
+            next_obs[:-1] = self.obs[1:]
+            next_obs[-1] = self.obs[-1]
+        else:
+            next_obs = self.obs.clone()
+        flat_next_obs = next_obs.reshape((-1,) + self.obs_shape)
+
+        # placeholder next actions (a2) - zeros (PPO training here doesn't need a2)
+        flat_next_actions = torch.zeros_like(flat_actions)
+
+        flat_dsc = 1.0 - flat_dones
+
+        return OrderedDict(
+            [
+                ("obs", flat_obs),
+                ("actions", flat_actions),
+                ("logprobs", flat_logprobs),
+                ("rewards", flat_rewards),
+                ("dones", flat_dones),
+                ("values", flat_values),
+                ("s1", flat_obs),
+                ("a1", flat_actions),
+                ("s2", flat_next_obs),
+                ("a2", flat_next_actions),
+                ("reward", flat_rewards),
+                ("done", flat_dones),
+                ("dsc", flat_dsc),
+            ]
+        )
 
     def clear(self) -> None:
         """Reset all buffers to zero (useful for sequential collection)."""

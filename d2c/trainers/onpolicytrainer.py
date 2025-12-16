@@ -53,75 +53,16 @@ class OnPolicyTrainer(BaseTrainer):
         _custom_train()
 
     def _train_behavior(self) -> None:
-        b_ckpt_dir = self._train_cfg.behavior_ckpt_dir
-        train_summary_writer, _ = self.check_ckpt(b_ckpt_dir)
-        if train_summary_writer is not None:
-            # Train the behavior
-            for i in range(self._train_steps):
-                train_b_info = self._agent.train_behavior_step()
-                if i % self._print_freq == 0:
-                    logging.info(utils.get_summary_str(step=i, info=train_b_info))
-                if i % self._summary_freq == 0 or i == self._train_steps:
-                    self._agent.write_b_train_summary(train_summary_writer, i, train_b_info)
-            self._agent.save_behavior_model(b_ckpt_dir)
-        self._agent.restore_behavior_model(b_ckpt_dir)
-        train_summary_writer.close()
+        pass
 
     def _train_dynamics(self) -> None:
-        d_ckpt_dir = self._train_cfg.dynamics_ckpt_dir
-        train_summary_writer, train_summary_dir = self.check_ckpt(d_ckpt_dir)
-        logger_name = '(Dyna)' + self._model_cfg.train.wandb.name
-        _config = copy.deepcopy(self._model_cfg.env.learned)
-        _keys = list(_config.keys())
-        for k in _keys:
-            _config.pop(k) if k not in ['dynamic_module_type', 'with_reward', _config.dynamic_module_type] else None
-        wandb_logger = self._build_wandb_logger(dir_=train_summary_dir, name=logger_name, _config=_config)
-        if train_summary_writer is not None:
-            # Train the dynamics
-            dyna = make_dynamics(self._config, self._train_data)
-            step = dyna.global_step
-            while step < self._train_steps:
-                dyna.train_step()
-                step = dyna.global_step
-                if step % self._print_freq == 0:
-                    dyna.test_step()
-                    dyna.print_train_info()
-                if step % self._summary_freq == 0 or step == self._train_steps:
-                    dyna.test_step()
-                    dyna.write_train_summary(train_summary_writer)
-            dyna.save(d_ckpt_dir)
-            train_summary_writer.close()
-            wandb_logger.finish()
-        self._env.load()
+        pass
 
     def _train_q(self) -> None:
-        q_ckpt_dir = self._train_cfg.q_ckpt_dir
-        train_summary_writer, _ = self.check_ckpt(q_ckpt_dir)
-        if train_summary_writer is not None:
-            # Train the Q-value function
-            for i in range(self._train_steps):
-                train_q_info = self._agent.train_q_step(i)
-                if i % self._print_freq == 0:
-                    logging.info(utils.get_summary_str(step=i, info=train_q_info))
-                if i % self._summary_freq == 0 or i == self._train_steps:
-                    self._agent.write_q_train_summary(train_summary_writer, i, train_q_info)
-            self._agent.save_q_model(q_ckpt_dir)
-        self._agent.restore_q_model(q_ckpt_dir)
-        train_summary_writer.close()
+        pass
 
     def _train_vae_s(self) -> None:
-        vae_s_ckpt_dir = self._train_cfg.vae_s_ckpt_dir
-        train_summary_writer, _ = self.check_ckpt(vae_s_ckpt_dir)
-        if train_summary_writer is not None:
-            for i in range(self._train_steps):
-                train_vae_s_info = self._agent.train_vae_s_step()
-                if i % self._print_freq == 0:
-                    logging.info(utils.get_summary_str(step=i, info=train_vae_s_info))
-                if i % self._summary_freq == 0 or i == self._train_steps:
-                    self._agent.write_vaes_train_summary(train_summary_writer, i, train_vae_s_info)
-            self._agent.save_vae_s_model(vae_s_ckpt_dir)
-        self._agent.restore_vae_s_model(vae_s_ckpt_dir)
-        train_summary_writer.close()
+        pass
 
     def _train_agent(self) -> None:
         agent_ckpt_dir = self._train_cfg.agent_ckpt_dir

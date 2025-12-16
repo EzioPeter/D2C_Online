@@ -69,13 +69,13 @@ class ActorNetwork(nn.Module):
             self,
             observation_space: Union[Box, Space],
             action_space: Union[Box, Space],
-            fc_layers_params: Sequence[int] = (),
+            fc_layer_params: Sequence[int] = (),
             device: Union[str, int, torch.device] = 'cpu',
     ):
         super().__init__()
         self.observation_dim = observation_space.shape[0]
         self.action_dim = action_space.shape[0]
-        self.arch = "-".join(map(str, fc_layers_params))
+        self.arch = "-".join(map(str, fc_layer_params))
         self.device = device
         self.actor_mean = nn.Sequential(
             layer_init(nn.Linear(np.array(self.observation_dim).prod(),64)),
@@ -99,12 +99,13 @@ class CriticNetwork(nn.Module):
     def __init__(
             self,
             observation_space: Union[Box, Space],
-            fc_layers_params: Sequence[int] = (),
+            action_space: Union[Box, Space],
+            fc_layer_params: Sequence[int] = (),
             device: Union[str, int, torch.device] = 'cpu',
     ):
         super().__init__()
         self.observation_dim = observation_space.shape[0]
-        self.arch = "-".join(map(str, fc_layers_params))
+        self.arch = "-".join(map(str, fc_layer_params))
         self.device = device
         self.critic = nn.Sequential(
             layer_init(nn.Linear(np.array(self.observation_dim).prod(),64)),

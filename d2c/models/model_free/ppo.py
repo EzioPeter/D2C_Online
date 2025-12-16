@@ -53,7 +53,6 @@ class PPOAgent(BaseAgent):
         self._joint_noise_std = joint_noise_std
         self._max_traj_length = max_traj_length
         self._p_info = collections.OrderedDict()
-        super(PPOAgent, self).__init__(**kwargs)
         self._total_timesteps = total_timesteps
         self._num_envs = num_envs
         self._num_steps = num_steps
@@ -72,6 +71,7 @@ class PPOAgent(BaseAgent):
         self._mini_batch_size = mini_batch_size
         self._num_iterations = num_iterations
         self._env_seed = env_seed
+        super(PPOAgent, self).__init__(**kwargs)
         
     def _get_modules(self) -> utils.Flags:
         model_params_q, n_q_fns = self._model_params.q
@@ -108,9 +108,6 @@ class PPOAgent(BaseAgent):
         self._q_target_fns = self._agent_module.q_target_nets
         self._p_fn = self._agent_module.p_net
         self._p_target_fn = self._agent_module.p_target_net
-        self._sampler_policy = None
-        if self._automatic_entropy_tuning:
-            self._log_alpha_fn = self._agent_module.log_alpha_net
 
     def _init_vars(self) -> None:
         self._batch_size = int(self._num_envs * self._num_steps)
@@ -119,8 +116,8 @@ class PPOAgent(BaseAgent):
         self._train_data = onpolicytransitions.OnPolicyTransitions( 
             num_steps=self._num_steps,
             num_envs=self._num_envs,
-            obs_shape=self._observation_space.shape[0],
-            action_shape=self._action_space.shape[0],
+            obs_shape=self._observation_space.shape,
+            action_shape=self._action_space.shape,
             device=self._device,
         )
 
@@ -132,7 +129,7 @@ class PPOAgent(BaseAgent):
             weight_decay=self._weight_decays,
         )
         self._q_optimizer = utils.get_optimizer(opts.q[0])(
-            parameters=list(self._q_fns[0].parameters())+list(self._q_fns[1].parameters()),
+            parameters=self._q_fns[0].parameters(),
             lr=opts.q[1],
             weight_decay=self._weight_decays,
         )
@@ -154,10 +151,7 @@ class PPOAgent(BaseAgent):
             self._q_target_fns[1](next_states, new_next_actions),
         )
 
-        if self._backup_entropy:
-            target_q_values = target_q_values - self.alpha * next_log_pi
-
-        q_target = self._reward_scale * rewards + dsc * self._discount * target_q_values
+        q_target = rewards + dsc * self._discount * target_q_values
 
         qf1_loss = F.mse_loss(qf1_pred, q_target.detach())
         qf2_loss = F.mse_loss(qf2_pred, q_target.detach())
@@ -209,7 +203,7 @@ class PPOAgent(BaseAgent):
                 for _ in trange(self._rollout_sim_num):
                     self._traj_steps += 1
                     state = self._current_state
-                    action = self._sampler_policy(state)
+                    action = self._p_fn(state)
                     if self._joint_noise_std > 0:
                         next_state, reward, done, __ = self._env.step(
                             action + np.random.randn(action.shape[0], ) * self._joint_noise_std)
@@ -232,14 +226,12 @@ class PPOAgent(BaseAgent):
         info = collections.OrderedDict()
 
         self.new_actions, self.log_pi = self._p_fn(batch['s1'])
-        if self._global_step % self._update_actor_freq == 0:
-            p_loss, self._p_info = self._build_p_loss(batch)
+        p_loss, self._p_info = self._build_p_loss(batch)
         q_loss, q_info = self._build_q_loss(batch)
 
-        if self._global_step % self._update_actor_freq == 0:
-            self._p_optimizer.zero_grad()
-            p_loss.backward()
-            self._p_optimizer.step()
+        self._p_optimizer.zero_grad()
+        p_loss.backward()
+        self._p_optimizer.step()
 
         self._q_optimizer.zero_grad()
         q_loss.backward()
@@ -254,7 +246,7 @@ class PPOAgent(BaseAgent):
         return info
     
     def _build_test_policies(self) -> None:
-        policy = self._sampler_policy
+        policy = self._p_fn
         self._test_policies['main'] = policy
     
     def save(self, ckpt_name: str) -> None:
