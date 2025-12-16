@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 from typing import Union, Tuple, Any, Sequence, Dict, Iterator
 from d2c.models.base import BaseAgent, BaseAgentModule
-from d2c.utils import networks, utils, policies
+from d2c.utils import networks, utils, policies, onpolicytransitions
 from d2c.networks_and_utils_for_agent.ppo_nets_utils import ActorNetwork, CriticNetwork
 
 class PPOAgent(BaseAgent):
@@ -78,7 +78,7 @@ class PPOAgent(BaseAgent):
         model_params_p = self._model_params.p[0]
 
         def q_net_factory():
-            return networks.CriticNetwork(
+            return CriticNetwork(
                 observation_space=self._observation_space,
                 action_space=self._action_space,
                 fc_layer_params=model_params_q,
@@ -93,19 +93,11 @@ class PPOAgent(BaseAgent):
                 device=self._device,
             )
 
-        def log_alpha_net_factory():
-            return networks.Scalar(
-                init_value=self._log_alpha_init_value,
-                device=self._device
-            )
-
         modules = utils.Flags(
             p_net_factory=p_net_factory,
             q_net_factory=q_net_factory,
             n_q_fns=n_q_fns,
-            log_alpha_net_factory=log_alpha_net_factory,
             device=self._device,
-            automatic_entropy_tuning=self._automatic_entropy_tuning,
         )
 
         return modules
@@ -124,6 +116,13 @@ class PPOAgent(BaseAgent):
         self._batch_size = int(self._num_envs * self._num_steps)
         self._mini_batch_size = int(self._batch_size // self._num_minibatches)
         self._num_iterations = self._total_timesteps // self._batch_size
+        self._train_data = onpolicytransitions.OnPolicyTransitions( 
+            num_steps=self._num_steps,
+            num_envs=self._num_envs,
+            obs_shape=self._observation_space.shape[0],
+            action_shape=self._action_space.shape[0],
+            device=self._device,
+        )
 
     def _build_optimizers(self) -> None:
         opts = self._optimizers
@@ -137,38 +136,6 @@ class PPOAgent(BaseAgent):
             lr=opts.q[1],
             weight_decay=self._weight_decays,
         )
-        if self._automatic_entropy_tuning:
-            self._alpha_optimizer = utils.get_optimizer(opts.alpha[0])(
-                parameters=self._log_alpha_fn.parameters(),
-                lr=opts.alpha[1],
-                weight_decay=self._weight_decays,
-            )
-        else:
-            self.log_alpha = None
-    
-    def _build_alpha_loss(self, batch: Dict) -> Tuple:
-        states = batch['s1']
-        actions = batch['a1']
-        rewards = batch['reward']
-        next_states = batch['s2']
-        dsc = batch['dsc']
-
-        log_pi = self.log_pi
-
-        if self._automatic_entropy_tuning:
-            alpha_loss = -(self._log_alpha_fn() * (log_pi + self._target_entropy).detach()).mean()
-            self.alpha = self._log_alpha_fn().exp() * self._alpha_multiplier
-        else:
-            alpha_loss = states.new_tensor(0.0)
-            self.alpha = states.new_tensor(self._alpha_multiplier)
-
-        info = collections.OrderedDict()
-        info['alpha'] = self.alpha
-        if self._automatic_entropy_tuning:
-            info['alpha_loss'] = alpha_loss
-            return alpha_loss, info
-        else:
-            return 0, info
 
     def _build_q_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
         states = batch['s1']
@@ -228,9 +195,13 @@ class PPOAgent(BaseAgent):
         return p_loss, info
 
     def _get_train_batch(self) -> Dict:
-        """Sample two batches of transitions from real dataset and sim replay buffer respectively."""
-        # periodically rollout transitions from sim env
         if self._global_step % self._rollout_sim_freq == 0:
+            if self._anneal_lr:
+                frac = 1.0 - (self._global_step - 1.0) / self._total_timesteps
+                lrnow = frac * self._optimizers.p[1]
+                self._p_optimizer.param_groups[0]['lr'] = lrnow
+                self._q_optimizer.param_groups[0]['lr'] = lrnow
+
             with torch.no_grad():
                 self._traj_steps = 0
                 # self._current_state = self._env.reset(seed=self._env_seed) # use it for debug
@@ -261,15 +232,9 @@ class PPOAgent(BaseAgent):
         info = collections.OrderedDict()
 
         self.new_actions, self.log_pi = self._p_fn(batch['s1'])
-        alpha_loss, alpha_info = self._build_alpha_loss(batch)
         if self._global_step % self._update_actor_freq == 0:
             p_loss, self._p_info = self._build_p_loss(batch)
         q_loss, q_info = self._build_q_loss(batch)
-
-        if self._automatic_entropy_tuning:
-            self._alpha_optimizer.zero_grad()
-            alpha_loss.backward()
-            self._alpha_optimizer.step()
 
         if self._global_step % self._update_actor_freq == 0:
             self._p_optimizer.zero_grad()
@@ -284,7 +249,6 @@ class PPOAgent(BaseAgent):
             self._update_target_fns(self._q_fns, self._q_target_fns)
             self._update_target_fns(self._p_fn, self._p_target_fn)
         
-        info.update(alpha_info)
         info.update(q_info)
         info.update(self._p_info)
         return info
@@ -303,7 +267,6 @@ class PPOAgent(BaseAgent):
 class AgentModule(BaseAgentModule):
     def _build_modules(self) -> None:
         device = self._net_modules.device
-        automatic_entropy_tuning = self._net_modules.automatic_entropy_tuning
         self._p_net = self._net_modules.p_net_factory().to(device)
         self._q_nets = nn.ModuleList()
         n_q_fns = self._net_modules.n_q_fns
@@ -311,8 +274,6 @@ class AgentModule(BaseAgentModule):
             self._q_nets.append(self._net_modules.q_net_factory().to(device))
         self._q_target_nets = copy.deepcopy(self._q_nets)    
         self._p_target_net = copy.deepcopy(self._p_net)
-        if automatic_entropy_tuning:
-            self._log_alpha_net = self._net_modules.log_alpha_net_factory().to(device)
         
     @property
     def q_nets(self) -> nn.ModuleList:
@@ -329,7 +290,3 @@ class AgentModule(BaseAgentModule):
     @property
     def p_target_net(self) -> nn.Module:
         return self._p_target_net
-    
-    @property
-    def log_alpha_net(self) -> nn.Module:
-        return self._log_alpha_net
