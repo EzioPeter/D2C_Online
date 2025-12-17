@@ -241,16 +241,16 @@ class PPOAgent(BaseAgent):
                 self._train_data.actions[step] = action
                 self._train_data.logprobs[step] = logprob
 
-                next_state, reward, termination, truncations, infos = self._env.step(action.cpu().numpy())
-                done = np.logical_or(termination, truncations)
+                next_state, reward, done, info = self._env.step(action.cpu().numpy())
+                
                 self._next_dones = torch.Tensor(done).to(self._device)
                 self._next_obs = torch.Tensor(next_state).to(self._device)
 
                 self._train_data.rewards[step] = torch.Tensor(reward).to(self._device)
 
-        _sim_batch = self._empty_dataset.sample_batch(self._batch_size)
+        batch = self._train_data.get_flat_batch()
         
-        return _sim_batch
+        return batch
 
     def _optimize_step(self, batch: Dict) -> Dict:
         info = collections.OrderedDict()
@@ -289,11 +289,11 @@ class PPOAgent(BaseAgent):
 class AgentModule(BaseAgentModule):
     def _build_modules(self) -> None:
         device = self._net_modules.device
-        self._p_net = self._net_modules.p_net_factory().to(device)
         self._q_nets = nn.ModuleList()
         n_q_fns = self._net_modules.n_q_fns
         for _ in range(n_q_fns):
             self._q_nets.append(self._net_modules.q_net_factory().to(device))
+        self._p_net = self._net_modules.p_net_factory().to(device)
         self._q_target_nets = copy.deepcopy(self._q_nets)    
         self._p_target_net = copy.deepcopy(self._p_net)
         
