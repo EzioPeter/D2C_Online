@@ -191,13 +191,13 @@ class OnPolicyTransitions:
                 ("logprobs", flat_logprobs),
                 ("rewards", flat_rewards),
                 ("dones", flat_dones),
-                ("values", flat_values),
-                ("s1", flat_obs),
-                ("a1", flat_actions),
+                ("values", self.values),
+                ("s1", self.obs),
+                ("a1", self.actions),
                 ("s2", flat_next_obs),
                 ("a2", flat_next_actions),
-                ("reward", flat_rewards),
-                ("done", flat_dones),
+                ("reward", self.rewards),
+                ("done", self.dones),
                 ("dsc", flat_dsc),
             ]
         )

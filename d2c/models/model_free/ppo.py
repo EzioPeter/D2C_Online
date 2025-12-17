@@ -137,21 +137,29 @@ class PPOAgent(BaseAgent):
         self._next_obs = None
         self._next_dones = None
 
+        self._episode_rewards = 0.0
+
     def _build_optimizers(self) -> None:
         opts = self._optimizers
-        self._p_optimizer = utils.get_optimizer(opts.p[0])(
-            parameters=self._p_fn.parameters(),
+        # self._p_optimizer = utils.get_optimizer(opts.p[0])(
+        #     parameters=self._p_fn.parameters(),
+        #     lr=opts.p[1],
+        #     weight_decay=self._weight_decays,
+        # )
+        # self._q_optimizer = utils.get_optimizer(opts.q[0])(
+        #     parameters=self._q_fns[0].parameters(),
+        #     lr=opts.q[1],
+        #     weight_decay=self._weight_decays,
+        # )
+        self._optimizer = utils.get_optimizer(opts.p[0])(
+            parameters=list(list(self._q_fns[0].parameters()) + list(self._p_fn.parameters())),
             lr=opts.p[1],
             weight_decay=self._weight_decays,
         )
-        self._q_optimizer = utils.get_optimizer(opts.q[0])(
-            parameters=self._q_fns[0].parameters(),
-            lr=opts.q[1],
-            weight_decay=self._weight_decays,
-        )
         # temporarily align cleanrl
-        self._p_optimizer.param_groups[0]['eps']=1e-5
-        self._q_optimizer.param_groups[0]['eps']=1e-5
+        # self._p_optimizer.param_groups[0]['eps']=1e-5
+        # self._q_optimizer.param_groups[0]['eps']=1e-5
+        self._optimizer.param_groups[0]['eps']=1e-5
 
     def _build_q_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
         states = batch['s1']
@@ -212,7 +220,7 @@ class PPOAgent(BaseAgent):
         info = self._optimize_step(train_batch)
         for key, val in info.items():
             self._train_info[key] = val.item()
-        self._global_step += self._num_envs * self._num_steps
+        # self._global_step += self._num_envs * self._num_steps
 
     def _get_train_batch(self) -> Dict:        
         with torch.no_grad():
@@ -225,10 +233,12 @@ class PPOAgent(BaseAgent):
             if self._anneal_lr:
                 frac = 1.0 - (self._current_iteration - 1.0) / self._total_iterations
                 lrnow = frac * self._optimizers.p[1]
-                self._p_optimizer.param_groups[0]['lr'] = lrnow
-                self._q_optimizer.param_groups[0]['lr'] = lrnow
+                # self._p_optimizer.param_groups[0]['lr'] = lrnow
+                # self._q_optimizer.param_groups[0]['lr'] = lrnow
+                self._optimizer.param_groups[0]['lr'] = lrnow
 
             for step in range(0, self._num_steps):
+                self._global_step += self._num_envs
                 state = self._next_obs
 
                 self._train_data.obs[step] = state
@@ -248,6 +258,12 @@ class PPOAgent(BaseAgent):
 
                 self._train_data.rewards[step] = torch.Tensor(reward).to(self._device)
 
+                if done.any():
+                    print(f"Episode done at step {self._global_step}, reward: {self._episode_rewards}")
+                    self._episode_rewards = 0.0
+                else:
+                    self._episode_rewards += reward
+
         batch = self._train_data.get_flat_batch()
         
         return batch
@@ -255,30 +271,123 @@ class PPOAgent(BaseAgent):
     def _optimize_step(self, batch: Dict) -> Dict:
         info = collections.OrderedDict()
 
-        self.new_actions, self.log_pi = self._p_fn(batch['s1'])
-        p_loss, self._p_info = self._build_p_loss(batch)
-        q_loss, q_info = self._build_q_loss(batch)
+        b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values = self.get_training_batch(batch)
 
-        self._p_optimizer.zero_grad()
-        p_loss.backward()
-        self._p_optimizer.step()
+        b_inds = np.arange(self._batch_size)
+        clipfracs = []
 
-        self._q_optimizer.zero_grad()
-        q_loss.backward()
-        self._q_optimizer.step()
+        for epoch in range(self._update_epochs):
+            np.random.shuffle(b_inds)
+            for start in range(0, self._batch_size, self._mini_batch_size):
+                end = start + self._mini_batch_size
+                mb_inds = b_inds[start:end]
 
-        if self._global_step % self._target_update_period == 0:
-            self._update_target_fns(self._q_fns, self._q_target_fns)
-            self._update_target_fns(self._p_fn, self._p_target_fn)
+                _, newlogprobs, entropy = self._p_fn(b_obs[mb_inds], b_actions[mb_inds])
+                newvalue = self._q_fns[0](b_obs[mb_inds])
+                logratio = newlogprobs - b_logprobs[mb_inds]
+                ratio = logratio.exp()
+
+                with torch.no_grad():
+                    old_approx_kl = (-logratio).mean()
+                    approx_kl = ((ratio - 1) - logratio).mean()
+                    clipfracs += [((ratio - 1.0).abs() > self._clip_coef).float().mean().item()]
+
+                mb_advantages = b_advantages[mb_inds]
+                if self._norm_adv:
+                    mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
+                
+                pg_loss1 = -mb_advantages * ratio
+                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self._clip_coef, 1 +  self._clip_coef)
+                pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+
+                newvalue = newvalue.view(-1)
+                if self._clip_vloss:
+                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
+                    v_clipped = b_values[mb_inds] + torch.clamp(
+                        newvalue - b_values[mb_inds],
+                        -self._clip_coef,
+                        self._clip_coef,
+                    )
+                    v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
+                    v_loss = 0.5 * torch.max(v_loss_unclipped, v_loss_clipped).mean()
+                else:
+                    v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
+
+                entropy_loss = entropy.mean()
+
+                loss = pg_loss - self._ent_coef * entropy_loss + self._vf_coef * v_loss
+
+                # self._p_optimizer.zero_grad()
+                # self._q_optimizer.zero_grad()
+                self._optimizer.zero_grad()
+
+                loss.backward()
+
+                # nn.utils.clip_grad_norm_(self._p_fn.parameters(), self._max_grad_norm)
+                # nn.utils.clip_grad_norm_(self._q_fns[0].parameters(), self._max_grad_norm)
+                nn.utils.clip_grad_norm_(list(list(self._q_fns[0].parameters()) + list(self._p_fn.parameters())), self._max_grad_norm)
+                # self._p_optimizer.step()
+                # self._q_optimizer.step()
+                self._optimizer.step()
+
+            if self._target_kl is not None and old_approx_kl > self._target_kl:
+                break
+
+        # self.new_actions, self.log_pi = self._p_fn(batch['s1'])
+        # p_loss, self._p_info = self._build_p_loss(batch)
+        # q_loss, q_info = self._build_q_loss(batch)
+
+        # self._p_optimizer.zero_grad()
+        # p_loss.backward()
+        # self._p_optimizer.step()
+
+        # self._q_optimizer.zero_grad()
+        # q_loss.backward()
+        # self._q_optimizer.step()
+
+        # if self._global_step % self._target_update_period == 0:
+        #     self._update_target_fns(self._q_fns, self._q_target_fns)
+        #     self._update_target_fns(self._p_fn, self._p_target_fn)
+        y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
+        var_y = np.var(y_true)
+        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
         
-        info.update(q_info)
-        info.update(self._p_info)
+        # info.update(q_info)
+        # info.update(self._p_info)
         return info
     
     def _build_test_policies(self) -> None:
         policy = self._p_fn
         self._test_policies['main'] = policy
     
+    def get_advantage(self, batch: Dict) -> Tensor:
+        with torch.no_grad():
+            next_values = self._q_fns[0](self._next_obs).reshape(1, -1)
+            # next_values = self._q_fns[0](batch['s1'])
+            advantages = torch.zeros_like(batch['reward']).to(self._device)
+            lastgaelam = 0
+            for t in reversed(range(self._num_steps)):
+                if t == self._num_steps - 1:
+                    nextnonterminal = 1.0 - self._next_dones
+                    nextvalues = next_values
+                else:
+                    nextnonterminal = 1.0 - batch['dones'][t + 1]
+                    nextvalues = batch['values'][t + 1]
+                delta = batch['reward'][t] + self._discount * nextvalues * nextnonterminal - batch['values'][t]
+                advantages[t] = lastgaelam = delta + self._discount * self._gae_lambda * nextnonterminal * lastgaelam
+            returns = advantages + batch['values']
+        return advantages, returns
+
+    def get_training_batch(self, batch: Dict) -> Dict:
+        training_batch_obs = batch['obs'].reshape((-1,) + self._observation_space.shape)
+        training_batch_logprobs = batch['logprobs'].reshape(-1)
+        training_batch_actions = batch['actions'].reshape((-1,) + self._action_space.shape)
+        advantages, returns = self.get_advantage(batch)
+        training_advantages = advantages.reshape(-1)
+        training_returns = returns.reshape(-1)
+        training_values = batch['values'].reshape(-1)
+        return training_batch_obs, training_batch_logprobs, training_batch_actions, training_advantages, training_returns, training_values
+
     def save(self, ckpt_name: str) -> None:
         pass
 
