@@ -224,12 +224,12 @@ class PPOAgent(BaseAgent):
 
     def _get_train_batch(self) -> Dict:        
         with torch.no_grad():
-            # self._current_state = self._env.reset(seed=self._env_seed) # use it for debug, gym
-            self._current_state, _ = self._env.reset(seed=self._env_seed) # use it for debug, gymnasium
-            # self._current_state = self._env.reset()
-            self._next_obs = self._current_state
-            self._next_obs = torch.Tensor(self._next_obs).to(self._device)
-            self._next_dones = torch.zeros(self._num_envs,).to(self._device)
+            # # self._current_state = self._env.reset(seed=self._env_seed) # use it for debug, gym
+            # self._current_state, _ = self._env.reset(seed=self._env_seed) # use it for debug, gymnasium
+            # # self._current_state = self._env.reset()
+            # self._next_obs = self._current_state
+            # self._next_obs = torch.Tensor(self._next_obs).to(self._device)
+            # self._next_dones = torch.zeros(self._num_envs,).to(self._device)
 
             if self._anneal_lr:
                 frac = 1.0 - (self._current_iteration - 1.0) / self._total_iterations
@@ -343,6 +343,9 @@ class PPOAgent(BaseAgent):
 
             if self._target_kl is not None and old_approx_kl > self._target_kl:
                 break
+
+            # if epoch == self._update_epochs - 1:
+            #     pass
 
         # self.new_actions, self.log_pi = self._p_fn(batch['s1'])
         # p_loss, self._p_info = self._build_p_loss(batch)
