@@ -249,7 +249,14 @@ class PPOAgent(BaseAgent):
     def _optimize_step(self, batch: Dict) -> Dict:
         info = collections.OrderedDict()
 
-        b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values = self.get_training_batch(batch)
+        # b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values = self.get_training_batch(batch)
+        b_batch = self.get_training_batch(batch)
+        b_obs = b_batch['s1']
+        b_logprobs = b_batch['logprob']
+        b_actions = b_batch['a1']
+        b_advantages = b_batch['advantage']
+        b_returns = b_batch['return']
+        b_values = b_batch['value']
 
         b_inds = np.arange(self._batch_size)
         clipfracs = []
@@ -339,7 +346,17 @@ class PPOAgent(BaseAgent):
         training_advantages = advantages.reshape(-1)
         training_returns = returns.reshape(-1)
         training_values = batch['value'].reshape(-1)
-        return training_batch_obs, training_batch_logprobs, training_batch_actions, training_advantages, training_returns, training_values
+        # return training_batch_obs, training_batch_logprobs, training_batch_actions, training_advantages, training_returns, training_values
+        return collections.OrderedDict(
+            [
+                ("s1", training_batch_obs),
+                ("a1", training_batch_actions),
+                ("logprob", training_batch_logprobs),
+                ("advantage", training_advantages),
+                ("return", training_returns),
+                ("value", training_values),
+            ]
+        )
 
     def save(self, ckpt_name: str) -> None:
         pass
