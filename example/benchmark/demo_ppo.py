@@ -62,7 +62,7 @@ def main(args: Args):
         'project': 'test',
         'name': command_args['env.external.data_name']+'_'+command_args['env.external.unreal_dynamics']+'x'+str(command_args['env.external.variety_degree'])+'_seed='+str(command_args['train.seed'])+'_'+nowTime,
         'reinit': False,
-        'mode': 'offline'
+        'mode': 'online'
     }
     command_args.update({'train.wandb': wandb})
 

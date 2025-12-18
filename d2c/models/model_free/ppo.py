@@ -5,6 +5,7 @@ Paper: https://arxiv.org/abs/1707.06347
 import collections
 
 import copy
+import logging
 from ml_collections import ConfigDict
 
 import torch
@@ -103,7 +104,6 @@ class PPOAgent(BaseAgent):
         return modules
     
     def _build_agent(self) -> None:
-        """Builds agent components."""
         self._init_vars()
         self._build_fns()
         self._build_optimizers()
@@ -148,59 +148,58 @@ class PPOAgent(BaseAgent):
         )
         self._optimizer.param_groups[0]['eps']=1e-5
 
-    def _build_q_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
-        states = batch['s1']
-        actions = batch['a1']
-        rewards = batch['reward']
-        next_states = batch['s2']
-        dsc = batch['dsc']
+    def _build_q_loss(self, batch: Dict, mb_inds: np.ndarray) -> Tuple[Tensor, Dict]:
+        b_obs = batch['s1']
+        b_returns = batch['return']
+        b_values = batch['value']
         
-        qf1_pred = self._q_fns[0](states, actions)
-        qf2_pred = self._q_fns[1](states, actions)
-
-        new_next_actions, next_log_pi = self._p_fn(next_states)
-
-        target_q_values = torch.min(
-            self._q_target_fns[0](next_states, new_next_actions),
-            self._q_target_fns[1](next_states, new_next_actions),
-        )
-
-        q_target = rewards + dsc * self._discount * target_q_values
-
-        qf1_loss = F.mse_loss(qf1_pred, q_target.detach())
-        qf2_loss = F.mse_loss(qf2_pred, q_target.detach())
-        qf_loss = qf1_loss + qf2_loss
+        newvalue = self._q_fns[0](b_obs[mb_inds])
+        newvalue = newvalue.view(-1)
+        if self._clip_vloss:
+            v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
+            v_clipped = b_values[mb_inds] + torch.clamp(
+                newvalue - b_values[mb_inds],
+                -self._clip_coef,
+                self._clip_coef,
+            )
+            v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
+            v_loss = 0.5 * torch.max(v_loss_unclipped, v_loss_clipped).mean()
+        else:
+            v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
 
         info = collections.OrderedDict()
-        info['Q1_loss'] = qf1_loss.detach().mean()
-        info['Q2_loss'] = qf2_loss.detach().mean()
-        info['Q_loss'] = qf_loss.detach().mean()
-        info['average_qf1'] = qf1_pred.detach().mean()
-        info['average_qf2'] = qf2_pred.detach().mean()
-        info['average_target_q'] = target_q_values.detach().mean()
+        info['v_loss'] = v_loss.detach().mean()
         
-        return qf_loss, info
+        return v_loss, info
     
-    def _build_p_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
-        states = batch['s1']
-        actions = batch['a1']
-        rewards = batch['reward']
-        next_states = batch['s2']
-        dsc = batch['dsc']
+    def _build_p_loss(self, batch: Dict, mb_inds: np.ndarray) -> Tuple[Tensor, Tensor, Tensor, Dict]:
+        b_obs = batch['s1']
+        b_logprobs = batch['logprob']
+        b_actions = batch['a1']
+        b_advantages = batch['advantage']
 
-        new_actions = self.new_actions
-        log_pi = self.log_pi
+        _, newlogprobs, entropy = self._p_fn(b_obs[mb_inds], b_actions[mb_inds])
+        logratio = newlogprobs - b_logprobs[mb_inds]
+        ratio = logratio.exp()
+        old_approx_kl, approx_kl, clipfracs = self.calculate_kl(logratio)
 
-        q_new_actions = torch.min(
-            self._q_fns[0](states, new_actions),
-            self._q_fns[1](states, new_actions),
-        )
-        p_loss = (self.alpha * log_pi - q_new_actions).mean()
+        mb_advantages = b_advantages[mb_inds]
+        if self._norm_adv:
+            mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
+        
+        pg_loss1 = -mb_advantages * ratio
+        pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self._clip_coef, 1 +  self._clip_coef)
+        pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+
+        entropy_loss = entropy.mean()
 
         info = collections.OrderedDict()
-        info['actor_loss'] = p_loss.detach().mean()
-        info['log_pi'] = log_pi.detach().mean()
-        return p_loss, info
+        info['actor_loss'] = pg_loss.detach().mean()
+        info['log_pi'] = newlogprobs.detach().mean()
+        info['actor_entropy'] = entropy_loss.detach().mean()
+        info['approx_kl'] = approx_kl.detach().mean()
+        info['old_approx_kl'] = old_approx_kl.detach().mean()
+        return pg_loss, entropy_loss, old_approx_kl, info
 
     def train_step(self) -> None:
         train_batch = self._get_train_batch()
@@ -240,24 +239,16 @@ class PPOAgent(BaseAgent):
                 if "final_info" in infos:
                     for info in infos["final_info"]:
                         if info and "episode" in info:
-                            print(f"global_step={self._global_step}, episodic_return={info['episode']['r']}")
+                            logging.info(f"global_step={self._global_step}, episodic_return={info['episode']['r']}")
 
         batch = self._train_data.get_batch()
         
         return batch
 
-    def _optimize_step(self, batch: Dict) -> Dict:
-        info = collections.OrderedDict()
+    def _optimize_step(self, batch: Dict) -> Dict: 
         b_batch = self.get_training_batch(batch)
-        b_obs = b_batch['s1']
-        b_logprobs = b_batch['logprob']
-        b_actions = b_batch['a1']
-        b_advantages = b_batch['advantage']
-        b_returns = b_batch['return']
-        b_values = b_batch['value']
 
         b_inds = np.arange(self._batch_size)
-        clipfracs = []
 
         for epoch in range(self._update_epochs):
             np.random.shuffle(b_inds)
@@ -265,34 +256,9 @@ class PPOAgent(BaseAgent):
                 end = start + self._mini_batch_size
                 mb_inds = b_inds[start:end]
 
-                _, newlogprobs, entropy = self._p_fn(b_obs[mb_inds], b_actions[mb_inds])
-                logratio = newlogprobs - b_logprobs[mb_inds]
-                ratio = logratio.exp()
-                old_approx_kl, approx_kl, clipfracs = self.compute_kl(logratio)
+                pg_loss, entropy_loss, old_approx_kl, p_info = self._build_p_loss(b_batch, mb_inds)
 
-                mb_advantages = b_advantages[mb_inds]
-                if self._norm_adv:
-                    mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
-                
-                pg_loss1 = -mb_advantages * ratio
-                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self._clip_coef, 1 +  self._clip_coef)
-                pg_loss = torch.max(pg_loss1, pg_loss2).mean()
-
-                newvalue = self._q_fns[0](b_obs[mb_inds])
-                newvalue = newvalue.view(-1)
-                if self._clip_vloss:
-                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                    v_clipped = b_values[mb_inds] + torch.clamp(
-                        newvalue - b_values[mb_inds],
-                        -self._clip_coef,
-                        self._clip_coef,
-                    )
-                    v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
-                    v_loss = 0.5 * torch.max(v_loss_unclipped, v_loss_clipped).mean()
-                else:
-                    v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
-
-                entropy_loss = entropy.mean()
+                v_loss, q_info = self._build_q_loss(b_batch, mb_inds)
 
                 loss = pg_loss - self._ent_coef * entropy_loss + self._vf_coef * v_loss
 
@@ -305,9 +271,13 @@ class PPOAgent(BaseAgent):
             if self._target_kl is not None and old_approx_kl > self._target_kl:
                 break
 
-        y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
-        var_y = np.var(y_true)
-        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+        explained_var_info =self.calculate_explained_variance(b_batch)
+
+        info = collections.OrderedDict()
+        info['global_step'] = torch.tensor(self._global_step)
+        info.update(p_info)
+        info.update(q_info)
+        info.update(explained_var_info)
         
         return info
     
@@ -332,7 +302,7 @@ class PPOAgent(BaseAgent):
             returns = advantages + batch['value']
         return advantages, returns
 
-    def compute_kl(self, logratio: Tensor) -> Tensor:
+    def calculate_kl(self, logratio: Tensor) -> Tensor:
         ratio = logratio.exp()
         clipfracs = []
         with torch.no_grad():
@@ -340,6 +310,15 @@ class PPOAgent(BaseAgent):
             approx_kl = ((ratio - 1) - logratio).mean()
             clipfracs += [((ratio - 1.0).abs() > self._clip_coef).float().mean().item()]
         return old_approx_kl, approx_kl, clipfracs
+
+    def calculate_explained_variance(self, batch: Dict) -> Dict:
+        y_pred, y_true = batch['value'].cpu().numpy(), batch['return'].cpu().numpy()
+        var_y = np.var(y_true)
+        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+
+        info = collections.OrderedDict()
+        info['explained_variance'] = explained_var
+        return info
 
     def get_training_batch(self, batch: Dict) -> Dict:
         training_batch_obs = batch['s1'].reshape((-1,) + self._observation_space.shape)

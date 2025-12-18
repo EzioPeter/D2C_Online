@@ -87,8 +87,8 @@ class OnPolicyTrainer(BaseTrainer):
             self._agent._current_iteration = iteration
             self._agent._total_iterations = total_iterations
             self._agent.train_step()
-            # if iteration % self._summary_freq == 0 or iteration == self._train_steps:
-            #     self._agent.write_train_summary(train_summary_writer)
+            if iteration % self._summary_freq == 0 or iteration == self._train_steps:
+                self._agent.write_train_summary(train_summary_writer)
             # if iteration % self._print_freq == 0 or iteration == self._train_steps:
             #     self._agent.print_train_info()
             # if iteration % self._eval_freq == 0 or iteration == self._train_steps:
@@ -106,8 +106,8 @@ class OnPolicyTrainer(BaseTrainer):
             #     self._agent.save(agent_ckpt_dir)
             #     logging.info(f'Agent saved at {agent_ckpt_dir}.')
         # self._agent.save(agent_ckpt_dir)
-        # train_summary_writer.close()
-        # wandb_logger.finish()
+        train_summary_writer.close()
+        wandb_logger.finish()
         time_cost = time.time() - time_st_total
         logging.info('Training finished, time cost %.4gs.', time_cost)
 

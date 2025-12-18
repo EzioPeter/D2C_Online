@@ -12,7 +12,7 @@ setup(
     version='0.1.0',
     packages=find_packages(),
     install_requires=[
-        'gym==0.23.1',
+        'gymnasium==0.28.1',
         'numpy',
         'pandas',
         'torch==2.4.0',
