@@ -142,7 +142,7 @@ class PPOAgent(BaseAgent):
     def _build_optimizers(self) -> None:
         opts = self._optimizers
         self._optimizer = utils.get_optimizer(opts.p[0])(
-            parameters=list(list(self._q_fns[0].parameters()) + list(self._p_fn.parameters())),
+            parameters=list(self._q_fns[0].parameters()) + list(self._p_fn.parameters()),
             lr=opts.p[1],
             weight_decay=self._weight_decays,
         )
@@ -307,7 +307,7 @@ class PPOAgent(BaseAgent):
                 self._optimizer.zero_grad()
 
                 loss.backward()
-                nn.utils.clip_grad_norm_(list(list(self._q_fns[0].parameters()) + list(self._p_fn.parameters())), self._max_grad_norm)
+                nn.utils.clip_grad_norm_(list(self._q_fns[0].parameters()) + list(self._p_fn.parameters()), self._max_grad_norm)
                 self._optimizer.step()
 
             if self._target_kl is not None and old_approx_kl > self._target_kl:
