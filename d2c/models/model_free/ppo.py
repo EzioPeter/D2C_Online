@@ -211,13 +211,6 @@ class PPOAgent(BaseAgent):
 
     def _get_train_batch(self) -> Dict:        
         with torch.no_grad():
-            # # self._current_state = self._env.reset(seed=self._env_seed) # use it for debug, gym
-            # self._current_state, _ = self._env.reset(seed=self._env_seed) # use it for debug, gymnasium
-            # # self._current_state = self._env.reset()
-            # self._next_obs = self._current_state
-            # self._next_obs = torch.Tensor(self._next_obs).to(self._device)
-            # self._next_dones = torch.zeros(self._num_envs,).to(self._device)
-
             if self._anneal_lr:
                 frac = 1.0 - (self._current_iteration - 1.0) / self._total_iterations
                 lrnow = frac * self._optimizers.p[1]
@@ -237,8 +230,7 @@ class PPOAgent(BaseAgent):
                 self._train_data.actions[step] = action
                 self._train_data.logprobs[step] = logprob
 
-                # next_state, reward, done, info = self._env.step(action.cpu().numpy()) # gym
-                next_state, reward, termination, truncation, infos = self._env.step(action.cpu().numpy()) # gymnasium
+                next_state, reward, termination, truncation, infos = self._env.step(action.cpu().numpy())
                 done = np.logical_or(termination, truncation)
 
                 self._next_dones = torch.Tensor(done).to(self._device)
