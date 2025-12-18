@@ -40,7 +40,7 @@ def main(args: Args):
     command_args.update({
         'model.model_name': 'ppo',
         'train.device': device,
-        'train.seed': 42,
+        'train.seed': seed,
         'train.total_train_steps': 1000000,
         'train.batch_size': 256,
         'train.agent_ckpt_name': '1211'
