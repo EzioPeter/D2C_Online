@@ -141,24 +141,11 @@ class PPOAgent(BaseAgent):
 
     def _build_optimizers(self) -> None:
         opts = self._optimizers
-        # self._p_optimizer = utils.get_optimizer(opts.p[0])(
-        #     parameters=self._p_fn.parameters(),
-        #     lr=opts.p[1],
-        #     weight_decay=self._weight_decays,
-        # )
-        # self._q_optimizer = utils.get_optimizer(opts.q[0])(
-        #     parameters=self._q_fns[0].parameters(),
-        #     lr=opts.q[1],
-        #     weight_decay=self._weight_decays,
-        # )
         self._optimizer = utils.get_optimizer(opts.p[0])(
             parameters=list(list(self._q_fns[0].parameters()) + list(self._p_fn.parameters())),
             lr=opts.p[1],
             weight_decay=self._weight_decays,
         )
-        # temporarily align cleanrl
-        # self._p_optimizer.param_groups[0]['eps']=1e-5
-        # self._q_optimizer.param_groups[0]['eps']=1e-5
         self._optimizer.param_groups[0]['eps']=1e-5
 
     def _build_q_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
@@ -234,8 +221,6 @@ class PPOAgent(BaseAgent):
             if self._anneal_lr:
                 frac = 1.0 - (self._current_iteration - 1.0) / self._total_iterations
                 lrnow = frac * self._optimizers.p[1]
-                # self._p_optimizer.param_groups[0]['lr'] = lrnow
-                # self._q_optimizer.param_groups[0]['lr'] = lrnow
                 self._optimizer.param_groups[0]['lr'] = lrnow
 
             for step in range(0, self._num_steps):
@@ -261,19 +246,10 @@ class PPOAgent(BaseAgent):
 
                 self._train_data.rewards[step] = torch.Tensor(reward).to(self._device)
 
-                # if done.any():
-                #     self._episode_rewards += reward
-                #     print(f"Episode done at step {self._global_step}, reward: {self._episode_rewards}")
-                #     self._episode_rewards = 0.0
-                # else:
-                #     self._episode_rewards += reward
-
                 if "final_info" in infos:
                     for info in infos["final_info"]:
                         if info and "episode" in info:
                             print(f"global_step={self._global_step}, episodic_return={info['episode']['r']}")
-                            # writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
-                            # writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
 
         batch = self._train_data.get_flat_batch()
         
@@ -328,46 +304,19 @@ class PPOAgent(BaseAgent):
 
                 loss = pg_loss - self._ent_coef * entropy_loss + self._vf_coef * v_loss
 
-                # self._p_optimizer.zero_grad()
-                # self._q_optimizer.zero_grad()
                 self._optimizer.zero_grad()
 
                 loss.backward()
-
-                # nn.utils.clip_grad_norm_(self._p_fn.parameters(), self._max_grad_norm)
-                # nn.utils.clip_grad_norm_(self._q_fns[0].parameters(), self._max_grad_norm)
                 nn.utils.clip_grad_norm_(list(list(self._q_fns[0].parameters()) + list(self._p_fn.parameters())), self._max_grad_norm)
-                # self._p_optimizer.step()
-                # self._q_optimizer.step()
                 self._optimizer.step()
 
             if self._target_kl is not None and old_approx_kl > self._target_kl:
                 break
 
-            # if epoch == self._update_epochs - 1:
-            #     pass
-
-        # self.new_actions, self.log_pi = self._p_fn(batch['s1'])
-        # p_loss, self._p_info = self._build_p_loss(batch)
-        # q_loss, q_info = self._build_q_loss(batch)
-
-        # self._p_optimizer.zero_grad()
-        # p_loss.backward()
-        # self._p_optimizer.step()
-
-        # self._q_optimizer.zero_grad()
-        # q_loss.backward()
-        # self._q_optimizer.step()
-
-        # if self._global_step % self._target_update_period == 0:
-        #     self._update_target_fns(self._q_fns, self._q_target_fns)
-        #     self._update_target_fns(self._p_fn, self._p_target_fn)
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
         
-        # info.update(q_info)
-        # info.update(self._p_info)
         return info
     
     def _build_test_policies(self) -> None:
@@ -377,7 +326,6 @@ class PPOAgent(BaseAgent):
     def get_advantage(self, batch: Dict) -> Tensor:
         with torch.no_grad():
             next_values = self._q_fns[0](self._next_obs).reshape(1, -1)
-            # next_values = self._q_fns[0](batch['s1'])
             advantages = torch.zeros_like(batch['reward']).to(self._device)
             lastgaelam = 0
             for t in reversed(range(self._num_steps)):
