@@ -25,9 +25,6 @@ from dataclasses import dataclass
 @dataclass
 class Args:
     env_name: str = 'HalfCheetah-v2'
-    data_name: str = 'halfcheetah_medium_replay-v2'
-    unreal_dynamics: str = 'gravity'
-    variety_degree: float = 2.0
 
 def main(args: Args):
     seed = np.random.randint(0, 100) 
@@ -37,15 +34,11 @@ def main(args: Args):
         prefix + 'benchmark_name': 'gym',
         prefix + 'data_source': 'mujoco',
         prefix + 'env_name': 'HalfCheetah-v2',
-        prefix + 'data_name': 'halfcheetah_medium_replay-v2',
-        prefix + 'unreal_dynamics': 'gravity', # gravity, friction or joint_noise
-        prefix + 'variety_degree': 2.0, # multiplier on gravity acceleration, friction coefficient or joint_noise std
         prefix + 'state_normalize': False,
         prefix + 'score_normalize': True,
     }
     command_args.update({
         'model.model_name': 'ppo',
-        'train.data_loader_name': None,
         'train.device': device,
         'train.seed': 42,
         'train.total_train_steps': 1000000,
@@ -54,13 +47,10 @@ def main(args: Args):
     })
     command_args.update({
         prefix + 'env_name': args.env_name,
-        prefix + 'data_name': args.data_name,
-        prefix + 'unreal_dynamics': args.unreal_dynamics,
-        prefix + 'variety_degree': args.variety_degree,
     })
     wandb = {
         'project': 'test',
-        'name': command_args['env.external.data_name']+'_'+command_args['env.external.unreal_dynamics']+'x'+str(command_args['env.external.variety_degree'])+'_seed='+str(command_args['train.seed'])+'_'+nowTime,
+        'name': command_args['env.external.env_name']+'_seed='+str(command_args['train.seed'])+'_'+nowTime,
         'reinit': False,
         'mode': 'online'
     }
