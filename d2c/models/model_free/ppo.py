@@ -248,8 +248,6 @@ class PPOAgent(BaseAgent):
 
     def _optimize_step(self, batch: Dict) -> Dict:
         info = collections.OrderedDict()
-
-        # b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values = self.get_training_batch(batch)
         b_batch = self.get_training_batch(batch)
         b_obs = b_batch['s1']
         b_logprobs = b_batch['logprob']
@@ -270,12 +268,6 @@ class PPOAgent(BaseAgent):
                 _, newlogprobs, entropy = self._p_fn(b_obs[mb_inds], b_actions[mb_inds])
                 logratio = newlogprobs - b_logprobs[mb_inds]
                 ratio = logratio.exp()
-
-                # with torch.no_grad():
-                #     old_approx_kl = (-logratio).mean()
-                #     approx_kl = ((ratio - 1) - logratio).mean()
-                #     clipfracs += [((ratio - 1.0).abs() > self._clip_coef).float().mean().item()]
-
                 old_approx_kl, approx_kl, clipfracs = self.compute_kl(logratio)
 
                 mb_advantages = b_advantages[mb_inds]
@@ -357,7 +349,6 @@ class PPOAgent(BaseAgent):
         training_advantages = advantages.reshape(-1)
         training_returns = returns.reshape(-1)
         training_values = batch['value'].reshape(-1)
-        # return training_batch_obs, training_batch_logprobs, training_batch_actions, training_advantages, training_returns, training_values
         return collections.OrderedDict(
             [
                 ("s1", training_batch_obs),
