@@ -207,7 +207,6 @@ class PPOAgent(BaseAgent):
         info = self._optimize_step(train_batch)
         for key, val in info.items():
             self._train_info[key] = val.item()
-        # self._global_step += self._num_envs * self._num_steps
 
     def _get_train_batch(self) -> Dict:        
         with torch.no_grad():
