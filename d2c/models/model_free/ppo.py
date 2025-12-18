@@ -268,14 +268,15 @@ class PPOAgent(BaseAgent):
                 mb_inds = b_inds[start:end]
 
                 _, newlogprobs, entropy = self._p_fn(b_obs[mb_inds], b_actions[mb_inds])
-                newvalue = self._q_fns[0](b_obs[mb_inds])
                 logratio = newlogprobs - b_logprobs[mb_inds]
                 ratio = logratio.exp()
 
-                with torch.no_grad():
-                    old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfracs += [((ratio - 1.0).abs() > self._clip_coef).float().mean().item()]
+                # with torch.no_grad():
+                #     old_approx_kl = (-logratio).mean()
+                #     approx_kl = ((ratio - 1) - logratio).mean()
+                #     clipfracs += [((ratio - 1.0).abs() > self._clip_coef).float().mean().item()]
+
+                old_approx_kl, approx_kl, clipfracs = self.compute_kl(logratio)
 
                 mb_advantages = b_advantages[mb_inds]
                 if self._norm_adv:
@@ -285,6 +286,7 @@ class PPOAgent(BaseAgent):
                 pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self._clip_coef, 1 +  self._clip_coef)
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
+                newvalue = self._q_fns[0](b_obs[mb_inds])
                 newvalue = newvalue.view(-1)
                 if self._clip_vloss:
                     v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
@@ -337,6 +339,23 @@ class PPOAgent(BaseAgent):
                 advantages[t] = lastgaelam = delta + self._discount * self._gae_lambda * nextnonterminal * lastgaelam
             returns = advantages + batch['value']
         return advantages, returns
+
+    def compute_kl(self, logratio: Tensor) -> Tensor:
+        """Compute approximate KL divergence.
+
+        Args:
+            logratio (Tensor): log of the ratio of new and old policy.
+
+        Returns:
+            Tensor: approximate KL divergence.
+        """
+        ratio = logratio.exp()
+        clipfracs = []
+        with torch.no_grad():
+            old_approx_kl = (-logratio).mean()
+            approx_kl = ((ratio - 1) - logratio).mean()
+            clipfracs += [((ratio - 1.0).abs() > self._clip_coef).float().mean().item()]
+        return old_approx_kl, approx_kl, clipfracs
 
     def get_training_batch(self, batch: Dict) -> Dict:
         training_batch_obs = batch['s1'].reshape((-1,) + self._observation_space.shape)
