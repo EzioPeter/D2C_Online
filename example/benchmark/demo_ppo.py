@@ -59,11 +59,8 @@ def main(args: Args):
     config = make_config(command_args)
     env = benchmark_env(config=config)
 
-    # agent with an empty buffer
     agent = make_agent(config=config, env=env, data=None)
-    # envaluate in the real env
     evaluator = onpolicy_bm_eval(agent=agent, env=env, config=config)
-    # train in the sim env
     trainer = Trainer(agent=agent, train_data=None, config=config, env=env, evaluator=evaluator)
     trainer.train()
 
