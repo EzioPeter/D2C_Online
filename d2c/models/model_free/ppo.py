@@ -235,11 +235,6 @@ class PPOAgent(BaseAgent):
 
                 self._train_data.rewards[step] = torch.Tensor(reward).to(self._device)
 
-                if "final_info" in infos:
-                    for info in infos["final_info"]:
-                        if info and "episode" in info:
-                            logging.info(f"global_step={self._global_step}, episodic_return={info['episode']['r']}")
-
         batch = self._train_data.get_batch()
         
         return batch
