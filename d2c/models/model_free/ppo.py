@@ -122,7 +122,6 @@ class PPOAgent(BaseAgent):
     def _init_vars(self) -> None:
         self._batch_size = int(self._num_envs * self._num_steps)
         self._mini_batch_size = int(self._batch_size // self._num_minibatches)
-        self._num_iterations = self._total_timesteps // self._batch_size
         self._observation_space = self._env._env.single_observation_space
         self._action_space = self._env._env.single_action_space
         self._train_data = onpolicytransitions.OnPolicyTransitions( 
@@ -285,6 +284,17 @@ class PPOAgent(BaseAgent):
         policy = self._p_fn
         self._test_policies['main'] = policy
     
+    def _prepare_for_train(self, _train_steps: int) -> int:
+        self._total_timesteps = _train_steps
+        self._num_iterations = self._total_timesteps // self._batch_size
+
+        self._current_state, _ = self._env.reset(seed=self._env_seed)
+        self._next_obs = self._current_state
+        self._next_obs = torch.Tensor(self._next_obs).to(self._device)
+        self._next_dones = torch.zeros(self._num_envs,).to(self._device)
+
+        return self._num_iterations
+
     def get_advantage(self, batch: Dict) -> Tensor:
         with torch.no_grad():
             next_values = self._q_fns[0](self._next_obs).reshape(1, -1)

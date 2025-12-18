@@ -74,14 +74,7 @@ class OnPolicyTrainer(BaseTrainer):
 
         time_st_total = time.time()
         iteration = 0
-        total_iterations = self._train_steps // self._agent._batch_size
-
-        self._agent._total_timesteps = self._train_steps
-
-        self._agent._current_state, _ = self._agent._env.reset(seed=self._agent._env_seed)
-        self._agent._next_obs = self._agent._current_state
-        self._agent._next_obs = torch.Tensor(self._agent._next_obs).to(self._agent._device)
-        self._agent._next_dones = torch.zeros(self._agent._num_envs,).to(self._agent._device)
+        total_iterations = self._agent._prepare_for_train(self._train_steps)
 
         while iteration < total_iterations + 1:
             iteration = iteration + 1
