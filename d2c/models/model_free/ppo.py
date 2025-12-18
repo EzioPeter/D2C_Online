@@ -104,7 +104,6 @@ class PPOAgent(BaseAgent):
         return modules
     
     def _build_agent(self) -> None:
-        """Builds agent components."""
         self._init_vars()
         self._build_fns()
         self._build_optimizers()
@@ -151,9 +150,6 @@ class PPOAgent(BaseAgent):
 
     def _build_q_loss(self, batch: Dict, mb_inds: np.ndarray) -> Tuple[Tensor, Dict]:
         b_obs = batch['s1']
-        b_logprobs = batch['logprob']
-        b_actions = batch['a1']
-        b_advantages = batch['advantage']
         b_returns = batch['return']
         b_values = batch['value']
         
@@ -181,8 +177,6 @@ class PPOAgent(BaseAgent):
         b_logprobs = batch['logprob']
         b_actions = batch['a1']
         b_advantages = batch['advantage']
-        b_returns = batch['return']
-        b_values = batch['value']
 
         _, newlogprobs, entropy = self._p_fn(b_obs[mb_inds], b_actions[mb_inds])
         logratio = newlogprobs - b_logprobs[mb_inds]
@@ -254,15 +248,8 @@ class PPOAgent(BaseAgent):
     def _optimize_step(self, batch: Dict) -> Dict:
         info = collections.OrderedDict()
         b_batch = self.get_training_batch(batch)
-        # b_obs = b_batch['s1']
-        # b_logprobs = b_batch['logprob']
-        # b_actions = b_batch['a1']
-        # b_advantages = b_batch['advantage']
-        # b_returns = b_batch['return']
-        # b_values = b_batch['value']
 
         b_inds = np.arange(self._batch_size)
-        clipfracs = []
 
         for epoch in range(self._update_epochs):
             np.random.shuffle(b_inds)
@@ -270,36 +257,7 @@ class PPOAgent(BaseAgent):
                 end = start + self._mini_batch_size
                 mb_inds = b_inds[start:end]
 
-                # _, newlogprobs, entropy = self._p_fn(b_obs[mb_inds], b_actions[mb_inds])
-                # logratio = newlogprobs - b_logprobs[mb_inds]
-                # ratio = logratio.exp()
-                # old_approx_kl, approx_kl, clipfracs = self.compute_kl(logratio)
-
-                # mb_advantages = b_advantages[mb_inds]
-                # if self._norm_adv:
-                #     mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
-                
-                # pg_loss1 = -mb_advantages * ratio
-                # pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self._clip_coef, 1 +  self._clip_coef)
-                # pg_loss = torch.max(pg_loss1, pg_loss2).mean()
-
                 pg_loss, entropy_loss, old_approx_kl, p_info = self._build_p_loss(b_batch, mb_inds)
-
-                # newvalue = self._q_fns[0](b_obs[mb_inds])
-                # newvalue = newvalue.view(-1)
-                # if self._clip_vloss:
-                #     v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                #     v_clipped = b_values[mb_inds] + torch.clamp(
-                #         newvalue - b_values[mb_inds],
-                #         -self._clip_coef,
-                #         self._clip_coef,
-                #     )
-                #     v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
-                #     v_loss = 0.5 * torch.max(v_loss_unclipped, v_loss_clipped).mean()
-                # else:
-                #     v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
-
-                # entropy_loss = entropy.mean()
 
                 v_loss, q_info = self._build_q_loss(b_batch, mb_inds)
 
