@@ -194,7 +194,6 @@ class OnPolicyBMEval(BaseEval):
     def _eval_policy_episodes(self, policy: nn.Module) -> Tuple[float, float, np.ndarray]:
         results = []
         observation, _ = self._env.reset(seed=self._env_seed)
-        # done = False
         for i in range(self._n_steps):
             observation = torch.Tensor(observation).to(self._agent._device)
             action, _, _ = policy(observation)
@@ -205,6 +204,7 @@ class OnPolicyBMEval(BaseEval):
                     if info and "episode" in info:
                         results.append(info['episode']['r'])
         logging.info('='*20+f' Complete evaluation of {self._n_steps} steps! '+'='*20)
+        _ = self._agent._prepare_for_train(self._agent._total_timesteps)
         results = np.array(results)
         return float(np.mean(results)), float(np.std(results)), results
 
