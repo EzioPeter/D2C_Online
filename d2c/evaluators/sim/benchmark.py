@@ -180,7 +180,6 @@ class OnPolicyBMEval(BaseEval):
         self._agent = agent
         self._env = env
         self._env_seed = seed
-        self._env.reset(seed=seed)
         self._n_steps = n_eval_steps
         self._score_norm = score_normalize
         self._score_norm_min = score_norm_min
