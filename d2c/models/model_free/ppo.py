@@ -341,14 +341,6 @@ class PPOAgent(BaseAgent):
         return advantages, returns
 
     def compute_kl(self, logratio: Tensor) -> Tensor:
-        """Compute approximate KL divergence.
-
-        Args:
-            logratio (Tensor): log of the ratio of new and old policy.
-
-        Returns:
-            Tensor: approximate KL divergence.
-        """
         ratio = logratio.exp()
         clipfracs = []
         with torch.no_grad():
