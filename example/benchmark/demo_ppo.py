@@ -51,7 +51,7 @@ def main(args: Args):
     })
     wandb = {
         'project': 'test',
-        'name': 'dependent_p_q_optimizers_'+command_args['env.external.env_name']+'_seed='+str(command_args['train.seed'])+'_'+nowTime,
+        'name': command_args['env.external.env_name']+'_seed='+str(command_args['train.seed'])+'_'+nowTime,
         'reinit': False,
         'mode': 'online'
     }
