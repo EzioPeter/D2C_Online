@@ -35,7 +35,7 @@ def get_optimizer(name: str) -> Callable:
 # generate xml assets path: gym_xml_path
 def generate_xml_path() -> str:
     import os
-    import gym
+    import gymnasium as gym
     xml_path = os.path.join(gym.__file__[:-11], 'envs/mujoco/assets')
 
     assert os.path.exists(xml_path)
