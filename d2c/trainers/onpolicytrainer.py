@@ -74,7 +74,7 @@ class OnPolicyTrainer(BaseTrainer):
 
         time_st_total = time.time()
         iteration = 0
-        total_iterations = self._agent._prepare_for_train(self._train_steps)
+        total_iterations = self._agent._prepare_for_train(self._train_steps, self._train_cfg.seed)
 
         while iteration < total_iterations + 1:
             iteration = iteration + 1

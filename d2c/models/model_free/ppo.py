@@ -103,15 +103,6 @@ class PPOAgent(BaseAgent):
 
         return modules
     
-    def _build_agent(self) -> None:
-        self._init_vars()
-        self._build_fns()
-        self._build_optimizers()
-        self._global_step = 0
-        self._train_info = collections.OrderedDict()
-        self._test_policies = collections.OrderedDict()
-        self._build_test_policies()
-
     def _build_fns(self) -> None:
         self._agent_module = AgentModule(modules=self._modules)
         self._q_fns = self._agent_module.q_nets
@@ -279,11 +270,11 @@ class PPOAgent(BaseAgent):
         policy = self._p_fn
         self._test_policies['main'] = policy
     
-    def _prepare_for_train(self, _train_steps: int) -> int:
+    def _prepare_for_train(self, _train_steps: int, env_seed: int) -> int:
         self._total_timesteps = _train_steps
         self._num_iterations = self._total_timesteps // self._batch_size
 
-        self._current_state, _ = self._env.reset(seed=self._env_seed)
+        self._current_state, _ = self._env.reset(seed=env_seed)
         self._next_obs = self._current_state
         self._next_obs = torch.Tensor(self._next_obs).to(self._device)
         self._next_dones = torch.zeros(self._num_envs,).to(self._device)
