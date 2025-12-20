@@ -56,7 +56,7 @@
     ppo: {
       train_schedule: ['agent'],
       hyper_params: {
-        model_params: {q: [[256, 256], 1], p: [[256, 256],],},
+        model_params: {q: [[64, 64], 1], p: [[64, 64],],},
         optimizers: {ac: ['adam', 3e-4, 1e-5], },
       }
     },
