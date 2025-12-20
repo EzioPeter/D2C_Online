@@ -21,7 +21,7 @@ def miniblock(
 ) -> List[nn.Module]:
     """Construct a miniblock with given input/output-size, norm layer and \
     activation."""
-    layers: List[nn.Module] = [linear_layer(input_size, output_size)]
+    layers: List[nn.Module] = [layer_init(linear_layer(input_size, output_size))]
     if norm_layer is not None:
         layers += [norm_layer(output_size)]  # type: ignore
     if activation is not None:
@@ -68,7 +68,7 @@ class ActorNetwork(nn.Module):
         hidden_sizes = [self.observation_dim] + list(fc_layer_params)
         for in_dim, out_dim in zip(hidden_sizes[:-1], hidden_sizes[1:]):
             self._layers += miniblock(in_dim, out_dim, None, nn.Tanh)
-        self._layers += [nn.Linear(hidden_sizes[-1], self.action_dim)]
+        self._layers += [layer_init(nn.Linear(hidden_sizes[-1], self.action_dim), std=0.01)]
         self.device = device
         self.actor_mean = nn.Sequential(*self._layers)
         self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(self.action_dim)))
@@ -92,15 +92,13 @@ class CriticNetwork(nn.Module):
     ):
         super().__init__()
         self.observation_dim = observation_space.shape[0]
-        self.arch = "-".join(map(str, fc_layer_params))
+        self._layers = []
+        hidden_sizes = [self.observation_dim] + list(fc_layer_params)
+        for in_dim, out_dim in zip(hidden_sizes[:-1], hidden_sizes[1:]):
+            self._layers += miniblock(in_dim, out_dim, None, nn.Tanh)
+        self._layers += [layer_init(nn.Linear(hidden_sizes[-1], 1), std=1.0)]
         self.device = device
-        self.critic = nn.Sequential(
-            layer_init(nn.Linear(np.array(self.observation_dim).prod(),64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64,64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 1), std=1.0),
-        )
+        self.critic = nn.Sequential(*self._layers)
     
     def forward(self, x):
         return self.critic(x)
