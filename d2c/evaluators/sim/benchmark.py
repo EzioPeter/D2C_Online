@@ -203,7 +203,7 @@ class OnPolicyBMEval(BaseEval):
                     if info and "episode" in info:
                         results.append(info['episode']['r'])
         logging.info('='*20+f' Complete evaluation of {self._n_steps} steps! '+'='*20)
-        _ = self._agent._prepare_for_train(self._agent._total_timesteps)
+        _ = self._agent._prepare_for_train(self._agent._total_timesteps, self._env_seed)
         results = np.array(results)
         return float(np.mean(results)), float(np.std(results)), results
 
