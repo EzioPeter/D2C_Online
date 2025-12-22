@@ -84,16 +84,14 @@ class ActorNetwork(nn.Module):
         super().__init__()
         self.observation_dim = observation_space.shape[0]
         self.action_dim = action_space.shape[0]
+        self._device = device
         self._layers = []
         hidden_sizes = [self.observation_dim] + list(fc_layer_params)
         for in_dim, out_dim in zip(hidden_sizes[:-1], hidden_sizes[1:]):
             self._layers += miniblock(in_dim, out_dim, activation=nn.ReLU)
-        # self._layers += [nn.Linear(hidden_sizes[-1], self.action_dim)]
+        self._layers += [nn.Linear(hidden_sizes[-1], self.action_dim * 2)]
 
-        self.fc_12 = nn.Sequential(*self._layers)
-
-        self.fc_mean = nn.Linear(256, self.action_dim)
-        self.fc_logstd = nn.Linear(256, self.action_dim)
+        self.network = nn.Sequential(*self._layers)
         # action rescaling
         self.register_buffer(
             "action_scale",
@@ -111,9 +109,8 @@ class ActorNetwork(nn.Module):
         )
 
     def forward(self, x):
-        x = self.fc_12(x)
-        mean = self.fc_mean(x)
-        log_std = self.fc_logstd(x)
+        output = self.network(x)
+        mean, log_std = torch.chunk(output, 2, dim=-1)
         log_std = torch.tanh(log_std)
         log_std = LOG_STD_MIN + 0.5 * (LOG_STD_MAX - LOG_STD_MIN) * (log_std + 1)  # From SpinUp / Denis Yarats
 

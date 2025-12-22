@@ -126,7 +126,7 @@ class SACAgent(BaseAgent):
         opts = self._optimizers
         self._q_optimizer = utils.get_optimizer(opts.q[0])(
             parameters=list(self._q_fns[0].parameters())+list(self._q_fns[1].parameters()),
-            lr=1e-3,
+            lr=opts.q[1],
             weight_decay=self._weight_decays,
         )
         self._p_optimizer = utils.get_optimizer(opts.p[0])(
@@ -137,7 +137,7 @@ class SACAgent(BaseAgent):
         if self._automatic_entropy_tuning:
             self._alpha_optimizer = utils.get_optimizer(opts.alpha[0])(
                 parameters=[self._log_alpha_fn],
-                lr=1e-3,
+                lr=opts.alpha[1],
                 weight_decay=self._weight_decays,
             )
         else:
@@ -225,32 +225,6 @@ class SACAgent(BaseAgent):
         return p_loss, info
 
     def _get_train_batch(self) -> Dict:
-        """Sample two batches of transitions from real dataset and sim replay buffer respectively."""
-        # # periodically rollout transitions from sim env
-        # if self._global_step % self._rollout_sim_freq == 0:
-        #     with torch.no_grad():
-        #         self._traj_steps = 0
-        #         # self._current_state = self._env.reset(seed=self._env_seed) # use it for debug
-        #         self._current_state = self._env.reset()
-        #         for _ in trange(self._rollout_sim_num):
-        #             self._traj_steps += 1
-        #             state = self._current_state
-        #             action = self._sampler_policy(state)
-        #             if self._joint_noise_std > 0:
-        #                 next_state, reward, done, __ = self._env.step(
-        #                     action + np.random.randn(action.shape[0], ) * self._joint_noise_std)
-        #             else:
-        #                 next_state, reward, done, __ = self._env.step(action)
-
-        #             self._empty_dataset.add(state=state, action=action, next_state=next_state, next_action=0,
-        #                                     reward=reward, done=done)
-        #             self._current_state = next_state
-
-        #             if done or self._traj_steps >= self._max_traj_length:
-        #                 self._traj_steps = 0
-        #                 self._current_state = self._env.reset()
-
-        # _sim_batch = self._empty_dataset.sample_batch(self._batch_size)
         obs = self._current_state
         if self._global_step < self._learning_starts:
             actions = np.array([self._action_space.sample() for _ in range(self._num_envs)])
@@ -386,7 +360,7 @@ class AgentModule(BaseAgentModule):
         self._p_target_net = self._net_modules.p_net_factory().to(device)
         self._p_target_net.load_state_dict(self._p_net.state_dict())
         if automatic_entropy_tuning:
-            self._log_alpha_net = torch.zeros(1, requires_grad=True, device=device)
+            self._log_alpha_net = self._net_modules.log_alpha_net_factory().to(device)
         
     @property
     def q_nets(self) -> nn.ModuleList:
