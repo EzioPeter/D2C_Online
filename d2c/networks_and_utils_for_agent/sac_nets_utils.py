@@ -57,24 +57,15 @@ class CriticNetwork(nn.Module):
         self.action_dim = action_space.shape[0]
         self._layers = []
         hidden_sizes = [self.observation_dim + self.action_dim] + list(fc_layer_params)
-        # for in_dim, out_dim in zip(hidden_sizes[:-1], hidden_sizes[1:]):
-        #     self._layers += miniblock(in_dim, out_dim, activation=nn.ReLU)
-        # self._layers += [nn.Linear(hidden_sizes[-1], 1)]
+        for in_dim, out_dim in zip(hidden_sizes[:-1], hidden_sizes[1:]):
+            self._layers += miniblock(in_dim, out_dim, activation=nn.ReLU)
+        self._layers += [nn.Linear(hidden_sizes[-1], 1)]
 
-        # self.network = nn.Sequential(*self._layers)
-
-        self.fc1 = nn.Linear(
-            np.array(self.observation_dim + self.action_dim),
-            256,
-        )
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, 1)
+        self.network = nn.Sequential(*self._layers)
 
     def forward(self, x, a):
         x = torch.cat([x, a], 1)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = self.network(x)
         return x
 
 
@@ -95,14 +86,12 @@ class ActorNetwork(nn.Module):
         self.action_dim = action_space.shape[0]
         self._layers = []
         hidden_sizes = [self.observation_dim] + list(fc_layer_params)
-        # for in_dim, out_dim in zip(hidden_sizes[:-1], hidden_sizes[1:]):
-        #     self._layers += miniblock(in_dim, out_dim, activation=nn.ReLU)
+        for in_dim, out_dim in zip(hidden_sizes[:-1], hidden_sizes[1:]):
+            self._layers += miniblock(in_dim, out_dim, activation=nn.ReLU)
         # self._layers += [nn.Linear(hidden_sizes[-1], self.action_dim)]
 
-        # self.fc_mean = nn.Sequential(*self._layers)
+        self.fc_12 = nn.Sequential(*self._layers)
 
-        self.fc1 = nn.Linear(self.observation_dim, 256)
-        self.fc2 = nn.Linear(256, 256)
         self.fc_mean = nn.Linear(256, self.action_dim)
         self.fc_logstd = nn.Linear(256, self.action_dim)
         # action rescaling
@@ -122,8 +111,7 @@ class ActorNetwork(nn.Module):
         )
 
     def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = self.fc_12(x)
         mean = self.fc_mean(x)
         log_std = self.fc_logstd(x)
         log_std = torch.tanh(log_std)
