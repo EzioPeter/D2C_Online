@@ -57,9 +57,6 @@ class GymEnv(BaseEnv):
         This is used by `ConfigBuilder._get_env_space` which expects
         `environment_space.observation` and `environment_space.action`.
         """
-        # create a temporary env using the same factory as used in _load_model
-        # thunk = make_env(env_name, 0, False, "", 0.99)
-        # env = thunk()
         env = gym.make(env_name)
         try:
             observation_space = env.observation_space
