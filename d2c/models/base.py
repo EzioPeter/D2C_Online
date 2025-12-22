@@ -85,8 +85,8 @@ class BaseAgent(ABC):
 
     def _build_agent(self) -> None:
         """Builds agent components."""
-        self._build_fns()
         self._init_vars()
+        self._build_fns()
         self._build_optimizers()
         self._global_step = 0
         self._train_info = collections.OrderedDict()

@@ -1,4 +1,4 @@
-"""OnPolicy Trainer for RL models."""
+"""Trainer for RL models."""
 
 import os
 import time
@@ -17,10 +17,9 @@ from d2c.envs.learned.dynamics import make_dynamics
 from d2c.utils.logger import WandbLogger
 from d2c.utils.config import ConfigBuilder
 
-import torch
 
-class OnPolicyTrainer(BaseTrainer):
-    """Implementation of the onpolicy trainer.
+class OffPolicyTrainer(BaseTrainer):
+    """Implementation of the trainer.
 
     :param evaluator: the evaluation for testing the training polices. It should \
         contain an external perfect env such as :class:`~d2c.evaluators.sim.benchmark.BMEval`. \
@@ -40,14 +39,14 @@ class OnPolicyTrainer(BaseTrainer):
             env: LeaEnv = None,
             evaluator: Union[Any, BaseEval] = None
     ) -> None:
-        super(OnPolicyTrainer, self).__init__(agent, env, train_data, config)
+        super(OffPolicyTrainer, self).__init__(agent, env, train_data, config)
         self._train_steps = self._train_cfg.total_train_steps
-        self._summary_freq = self._train_cfg.on_policy_summary_freq
-        self._print_freq = self._train_cfg.on_policy_print_freq
-        self._save_freq = self._train_cfg.on_policy_save_freq
+        self._summary_freq = self._train_cfg.summary_freq
+        self._print_freq = self._train_cfg.print_freq
+        self._save_freq = self._train_cfg.save_freq
         self._agent_name = self._model_cfg.model.model_name
         self._evaluator = evaluator
-        self._eval_freq = self._train_cfg.on_policy_eval_freq
+        self._eval_freq = self._train_cfg.eval_freq
 
     def train(self) -> None:
         _custom_train = self._build_train_schedule()
@@ -73,34 +72,31 @@ class OnPolicyTrainer(BaseTrainer):
         wandb_logger = self._build_wandb_logger(dir_=train_summary_dir)
 
         time_st_total = time.time()
-        iteration = 0
-        total_iterations = self._agent._prepare_for_train(self._train_steps, self._train_cfg.seed)
-
-        while iteration < total_iterations + 1:
-            iteration = iteration + 1
-            self._agent._current_iteration = iteration
-            self._agent._total_iterations = total_iterations
+        self._agent._current_state, _ = self._env.reset(seed=self._train_cfg.seed)
+        step = self._agent.global_step
+        while step < self._train_steps:
             self._agent.train_step()
-            if iteration % self._summary_freq == 0 or iteration == self._train_steps:
-                self._agent.write_train_summary(train_summary_writer)
-            if iteration % self._print_freq == 0 or iteration == self._train_steps:
-                self._agent.print_train_info()
-            if iteration % self._eval_freq == 0 or iteration == self._train_steps:
-                if self._evaluator is not None:
-                    try:
-                        eval_info = self._evaluator.eval(self._agent._global_step)
-                    except:
-                        logging.info('Something wrong when evaluating the policy!')
-                    else:
-                        eval_info.update(global_step=self._agent._global_step)
-                        wandb_logger.write_summary(eval_info)
-                    if self._agent._global_step == self._train_steps:
-                        self._evaluator.save_eval_results()
-            if iteration % self._save_freq == 0:
-                self._agent.save(agent_ckpt_dir)
-                logging.info(f'Agent saved at {agent_ckpt_dir}.')
-        self._agent.save(agent_ckpt_dir)
-        train_summary_writer.close()
+            step = self._agent.global_step
+            # if step % self._summary_freq == 0 or step == self._train_steps:
+            #     self._agent.write_train_summary(train_summary_writer)
+            # if step % self._print_freq == 0 or step == self._train_steps:
+            #     self._agent.print_train_info()
+            # if step % self._eval_freq == 0 or step == self._train_steps:
+            #     if self._evaluator is not None:
+            #         try:
+            #             eval_info = self._evaluator.eval(step)
+            #         except:
+            #             logging.info('Something wrong when evaluating the policy!')
+            #         else:
+            #             eval_info.update(global_step=step)
+            #             wandb_logger.write_summary(eval_info)
+            #         if step == self._train_steps:
+            #             self._evaluator.save_eval_results()
+            # if step % self._save_freq == 0:
+            #     self._agent.save(agent_ckpt_dir)
+            #     logging.info(f'Agent saved at {agent_ckpt_dir}.')
+        # self._agent.save(agent_ckpt_dir)
+        # train_summary_writer.close()
         wandb_logger.finish()
         time_cost = time.time() - time_st_total
         logging.info('Training finished, time cost %.4gs.', time_cost)

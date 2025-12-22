@@ -6,7 +6,8 @@ from gymnasium.spaces import Space
 from typing import Tuple, Any, Union
 from d2c.envs import BaseEnv
 from d2c.utils.wrappers import wrapped_norm_obs_env
-from d2c.networks_and_utils_for_agent.ppo_nets_utils import make_env
+# from d2c.networks_and_utils_for_agent.ppo_nets_utils import make_env
+from d2c.networks_and_utils_for_agent.sac_nets_utils import make_env
 
 class GymEnv(BaseEnv):
     """The Env for Gym benchmark.
@@ -23,7 +24,8 @@ class GymEnv(BaseEnv):
         super(GymEnv, self).__init__()
 
     def _load_model(self):
-        gym_envs = gym.vector.SyncVectorEnv([make_env(self._env_name, 0, False, "", 0.99)])
+        # gym_envs = gym.vector.SyncVectorEnv([make_env(self._env_name, 0, False, "", 0.99)])
+        gym_envs = gym.vector.SyncVectorEnv([make_env(self._env_name, 0, 0, False, "")])
         self._env = gym_envs
 
     def _set_action_space(self) -> Space:
