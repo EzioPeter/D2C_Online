@@ -105,8 +105,8 @@ class SACAgent(BaseAgent):
         self._q_target_fns = self._agent_module.q_target_nets
         self._p_fn = self._agent_module.p_net
         self._p_target_fn = self._agent_module.p_target_net
-        # if self._automatic_entropy_tuning:
-        #     self._log_alpha_fn = self._agent_module.log_alpha_net
+        if self._automatic_entropy_tuning:
+            self._log_alpha_fn = self._agent_module.log_alpha_net
 
     def _init_vars(self) -> None:
         self._observation_space = self._env._env.single_observation_space
@@ -135,7 +135,6 @@ class SACAgent(BaseAgent):
             weight_decay=self._weight_decays,
         )
         if self._automatic_entropy_tuning:
-            self._log_alpha_fn = torch.zeros(1, requires_grad=True, device=self._device)
             self._alpha_optimizer = utils.get_optimizer(opts.alpha[0])(
                 parameters=[self._log_alpha_fn],
                 lr=1e-3,
@@ -389,8 +388,8 @@ class AgentModule(BaseAgentModule):
             self._q_target_nets[i].load_state_dict(self._q_nets[i].state_dict())
         self._p_target_net = self._net_modules.p_net_factory().to(device)
         self._p_target_net.load_state_dict(self._p_net.state_dict())
-        # if automatic_entropy_tuning:
-        #     self._log_alpha_net = self._net_modules.log_alpha_net_factory().to(device)
+        if automatic_entropy_tuning:
+            self._log_alpha_net = torch.zeros(1, requires_grad=True, device=device)
         
     @property
     def q_nets(self) -> nn.ModuleList:
