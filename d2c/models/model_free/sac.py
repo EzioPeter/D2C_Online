@@ -146,20 +146,25 @@ class SACAgent(BaseAgent):
             self._alpha = self._alpha_init_value
     
     def _build_alpha_loss(self, batch: Dict) -> Tuple:
-        states = batch['s1']
-        actions = batch['a1']
-        rewards = batch['reward']
-        next_states = batch['s2']
-        dsc = batch['dsc']
+        # states = batch['s1']
+        # actions = batch['a1']
+        # rewards = batch['reward']
+        # next_states = batch['s2']
+        # dsc = batch['dsc']
 
-        log_pi = self.log_pi
+        # log_pi = self.log_pi
 
-        if self._automatic_entropy_tuning:
-            alpha_loss = -(self._log_alpha_fn() * (log_pi + self._target_entropy).detach()).mean()
-            self._alpha = self._log_alpha_fn().exp() * self._alpha_multiplier
-        else:
-            alpha_loss = states.new_tensor(0.0)
-            self._alpha = states.new_tensor(self._alpha_multiplier)
+        # if self._automatic_entropy_tuning:
+        #     alpha_loss = -(self._log_alpha_fn() * (log_pi + self._target_entropy).detach()).mean()
+        #     self._alpha = self._log_alpha_fn().exp() * self._alpha_multiplier
+        # else:
+        #     alpha_loss = states.new_tensor(0.0)
+        #     self._alpha = states.new_tensor(self._alpha_multiplier)
+        obs = batch.observations.float()
+        with torch.no_grad():
+            _, log_pi, _ = self._p_fn.get_action(obs)
+        alpha_loss = (-self._log_alpha_fn.exp() * (log_pi + self._target_entropy)).mean()
+        self._alpha = self._log_alpha_fn.exp() * self._alpha_multiplier
 
         info = collections.OrderedDict()
         info['alpha'] = self._alpha
@@ -170,56 +175,78 @@ class SACAgent(BaseAgent):
             return 0, info
 
     def _build_q_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
-        states = batch['s1']
-        actions = batch['a1']
-        rewards = batch['reward']
-        next_states = batch['s2']
-        dsc = batch['dsc']
+        # states = batch['s1']
+        # actions = batch['a1']
+        # rewards = batch['reward']
+        # next_states = batch['s2']
+        # dsc = batch['dsc']
         
-        qf1_pred = self._q_fns[0](states, actions)
-        qf2_pred = self._q_fns[1](states, actions)
+        # qf1_pred = self._q_fns[0](states, actions)
+        # qf2_pred = self._q_fns[1](states, actions)
 
-        new_next_actions, next_log_pi = self._p_fn(next_states)
+        # new_next_actions, next_log_pi = self._p_fn(next_states)
 
-        target_q_values = torch.min(
-            self._q_target_fns[0](next_states, new_next_actions),
-            self._q_target_fns[1](next_states, new_next_actions),
-        )
+        # target_q_values = torch.min(
+        #     self._q_target_fns[0](next_states, new_next_actions),
+        #     self._q_target_fns[1](next_states, new_next_actions),
+        # )
 
-        if self._backup_entropy:
-            target_q_values = target_q_values - self._alpha * next_log_pi
+        # if self._backup_entropy:
+        #     target_q_values = target_q_values - self._alpha * next_log_pi
 
-        q_target = self._reward_scale * rewards + dsc * self._discount * target_q_values
+        # q_target = self._reward_scale * rewards + dsc * self._discount * target_q_values
 
-        qf1_loss = F.mse_loss(qf1_pred, q_target.detach())
-        qf2_loss = F.mse_loss(qf2_pred, q_target.detach())
+        # qf1_loss = F.mse_loss(qf1_pred, q_target.detach())
+        # qf2_loss = F.mse_loss(qf2_pred, q_target.detach())
+        # qf_loss = qf1_loss + qf2_loss
+
+        with torch.no_grad():
+            next_obs = batch.next_observations.float()
+            next_state_actions, next_state_log_pi, _ = self._p_fn.get_action(next_obs)
+            qf1_next_target = self._q_target_fns[0](next_obs, next_state_actions)
+            qf2_next_target = self._q_target_fns[1](next_obs, next_state_actions)
+            min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._log_alpha_fn.exp() * next_state_log_pi
+            next_q_value = batch.rewards.flatten() + (1 - batch.dones.flatten()) * self._discount * (min_qf_next_target).view(-1)
+
+        obs = batch.observations.float()
+        qf1_a_values = self._q_fns[0](obs, batch.actions).view(-1)
+        qf2_a_values = self._q_fns[1](obs, batch.actions).view(-1)
+        qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
+        qf2_loss = F.mse_loss(qf2_a_values, next_q_value)
         qf_loss = qf1_loss + qf2_loss
 
         info = collections.OrderedDict()
         info['Q1_loss'] = qf1_loss.detach().mean()
         info['Q2_loss'] = qf2_loss.detach().mean()
         info['Q_loss'] = qf_loss.detach().mean()
-        info['average_qf1'] = qf1_pred.detach().mean()
-        info['average_qf2'] = qf2_pred.detach().mean()
-        info['average_target_q'] = target_q_values.detach().mean()
+        info['average_qf1'] = qf1_a_values.detach().mean()
+        info['average_qf2'] = qf2_a_values.detach().mean()
+        info['average_target_q'] = min_qf_next_target.detach().mean()
         
         return qf_loss, info
     
     def _build_p_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
-        states = batch['s1']
-        actions = batch['a1']
-        rewards = batch['reward']
-        next_states = batch['s2']
-        dsc = batch['dsc']
+        # states = batch['s1']
+        # actions = batch['a1']
+        # rewards = batch['reward']
+        # next_states = batch['s2']
+        # dsc = batch['dsc']
 
-        new_actions = self.new_actions
-        log_pi = self.log_pi
+        # new_actions = self.new_actions
+        # log_pi = self.log_pi
 
-        q_new_actions = torch.min(
-            self._q_fns[0](states, new_actions),
-            self._q_fns[1](states, new_actions),
-        )
-        p_loss = (self._alpha * log_pi - q_new_actions).mean()
+        # q_new_actions = torch.min(
+        #     self._q_fns[0](states, new_actions),
+        #     self._q_fns[1](states, new_actions),
+        # )
+        # p_loss = (self._alpha * log_pi - q_new_actions).mean()
+
+        obs = batch.observations.float()
+        pi, log_pi, _ = self._p_fn.get_action(obs)
+        qf1_pi = self._q_fns[0](obs, pi)
+        qf2_pi = self._q_fns[1](obs, pi)
+        min_qf_pi = torch.min(qf1_pi, qf2_pi)
+        p_loss = ((self._log_alpha_fn.exp() * log_pi) - min_qf_pi).mean()
 
         info = collections.OrderedDict()
         info['actor_loss'] = p_loss.detach().mean()
@@ -287,53 +314,65 @@ class SACAgent(BaseAgent):
         # info.update(self._p_info)
 
         if self._global_step > self._learning_starts:
-            with torch.no_grad():
-                next_obs = batch.next_observations.float()
-                next_state_actions, next_state_log_pi, _ = self._p_fn.get_action(next_obs)
-                qf1_next_target = self._q_target_fns[0](next_obs, next_state_actions)
-                qf2_next_target = self._q_target_fns[1](next_obs, next_state_actions)
-                min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._log_alpha_fn.exp() * next_state_log_pi
-                next_q_value = batch.rewards.flatten() + (1 - batch.dones.flatten()) * self._discount * (min_qf_next_target).view(-1)
+            # with torch.no_grad():
+            #     next_obs = batch.next_observations.float()
+            #     next_state_actions, next_state_log_pi, _ = self._p_fn.get_action(next_obs)
+            #     qf1_next_target = self._q_target_fns[0](next_obs, next_state_actions)
+            #     qf2_next_target = self._q_target_fns[1](next_obs, next_state_actions)
+            #     min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._log_alpha_fn.exp() * next_state_log_pi
+            #     next_q_value = batch.rewards.flatten() + (1 - batch.dones.flatten()) * self._discount * (min_qf_next_target).view(-1)
 
-            obs = batch.observations.float()
-            qf1_a_values = self._q_fns[0](obs, batch.actions).view(-1)
-            qf2_a_values = self._q_fns[1](obs, batch.actions).view(-1)
-            qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
-            qf2_loss = F.mse_loss(qf2_a_values, next_q_value)
-            qf_loss = qf1_loss + qf2_loss
+            # obs = batch.observations.float()
+            # qf1_a_values = self._q_fns[0](obs, batch.actions).view(-1)
+            # qf2_a_values = self._q_fns[1](obs, batch.actions).view(-1)
+            # qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
+            # qf2_loss = F.mse_loss(qf2_a_values, next_q_value)
+            # qf_loss = qf1_loss + qf2_loss
 
-            # optimize the model
+            # # optimize the model
+            # self._q_optimizer.zero_grad()
+            # qf_loss.backward()
+            # self._q_optimizer.step()
+
+            q_loss, q_info = self._build_q_loss(batch)
             self._q_optimizer.zero_grad()
-            qf_loss.backward()
+            q_loss.backward()
             self._q_optimizer.step()
+
+            info.update(q_info)
 
             if self._global_step % self._update_actor_freq == 0:  # TD 3 Delayed update support
                 for _ in range(
                     self._update_actor_freq
                 ):  # compensate for the delay by doing 'actor_update_interval' instead of 1
-                    pi, log_pi, _ = self._p_fn.get_action(obs)
-                    qf1_pi = self._q_fns[0](obs, pi)
-                    qf2_pi = self._q_fns[1](obs, pi)
-                    min_qf_pi = torch.min(qf1_pi, qf2_pi)
-                    actor_loss = ((self._log_alpha_fn.exp() * log_pi) - min_qf_pi).mean()
+                    # pi, log_pi, _ = self._p_fn.get_action(obs)
+                    # qf1_pi = self._q_fns[0](obs, pi)
+                    # qf2_pi = self._q_fns[1](obs, pi)
+                    # min_qf_pi = torch.min(qf1_pi, qf2_pi)
+                    # actor_loss = ((self._log_alpha_fn.exp() * log_pi) - min_qf_pi).mean()
+                    p_loss, p_info = self._build_p_loss(batch)
 
                     self._p_optimizer.zero_grad()
-                    actor_loss.backward()
+                    p_loss.backward()
                     self._p_optimizer.step()
+                    info.update(p_info)   
 
                     if self._automatic_entropy_tuning:
-                        with torch.no_grad():
-                            _, log_pi, _ = self._p_fn.get_action(obs)
-                        alpha_loss = (-self._log_alpha_fn.exp() * (log_pi + self._target_entropy)).mean()
+                        # with torch.no_grad():
+                        #     _, log_pi, _ = self._p_fn.get_action(obs)
+                        # alpha_loss = (-self._log_alpha_fn.exp() * (log_pi + self._target_entropy)).mean()
+                        alpha_loss, alpha_info = self._build_alpha_loss(batch)
 
                         self._alpha_optimizer.zero_grad()
                         alpha_loss.backward()
                         self._alpha_optimizer.step()
-                        self._alpha = self._log_alpha_fn.exp().item()
+
+                        info.update(alpha_info)
 
             if self._global_step % self._target_update_period == 0:
                 self._update_target_fns(self._q_fns, self._q_target_fns)
-                self._update_target_fns(self._p_fn, self._p_target_fn)         
+                self._update_target_fns(self._p_fn, self._p_target_fn)  
+
         return info
     
     def _build_test_policies(self) -> None:
