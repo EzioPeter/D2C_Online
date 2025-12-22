@@ -225,32 +225,6 @@ class SACAgent(BaseAgent):
         return p_loss, info
 
     def _get_train_batch(self) -> Dict:
-        """Sample two batches of transitions from real dataset and sim replay buffer respectively."""
-        # # periodically rollout transitions from sim env
-        # if self._global_step % self._rollout_sim_freq == 0:
-        #     with torch.no_grad():
-        #         self._traj_steps = 0
-        #         # self._current_state = self._env.reset(seed=self._env_seed) # use it for debug
-        #         self._current_state = self._env.reset()
-        #         for _ in trange(self._rollout_sim_num):
-        #             self._traj_steps += 1
-        #             state = self._current_state
-        #             action = self._sampler_policy(state)
-        #             if self._joint_noise_std > 0:
-        #                 next_state, reward, done, __ = self._env.step(
-        #                     action + np.random.randn(action.shape[0], ) * self._joint_noise_std)
-        #             else:
-        #                 next_state, reward, done, __ = self._env.step(action)
-
-        #             self._empty_dataset.add(state=state, action=action, next_state=next_state, next_action=0,
-        #                                     reward=reward, done=done)
-        #             self._current_state = next_state
-
-        #             if done or self._traj_steps >= self._max_traj_length:
-        #                 self._traj_steps = 0
-        #                 self._current_state = self._env.reset()
-
-        # _sim_batch = self._empty_dataset.sample_batch(self._batch_size)
         obs = self._current_state
         if self._global_step < self._learning_starts:
             actions = np.array([self._action_space.sample() for _ in range(self._num_envs)])
