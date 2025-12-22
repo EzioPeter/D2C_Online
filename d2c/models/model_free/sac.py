@@ -253,8 +253,7 @@ class SACAgent(BaseAgent):
 
         # _sim_batch = self._empty_dataset.sample_batch(self._batch_size)
         obs = self._current_state
-        # if self._global_step < self._learning_starts:
-        if False:
+        if self._global_step < self._learning_starts:
             actions = np.array([self._action_space.sample() for _ in range(self._num_envs)])
         else:
             actions, _, _ = self._p_fn.get_action(torch.Tensor(obs).to(self._device))
@@ -313,7 +312,6 @@ class SACAgent(BaseAgent):
         # info.update(self._p_info)
 
         if self._global_step > self._learning_starts:
-        # if False:
             with torch.no_grad():
                 next_obs = batch.next_observations.float()
                 next_state_actions, next_state_log_pi, _ = self._p_fn.get_action(next_obs)
@@ -367,7 +365,6 @@ class SACAgent(BaseAgent):
         return info
     
     def _build_test_policies(self) -> None:
-        # policy = self._sampler_policy
         self._test_policies['main'] = self._p_fn
     
     def save(self, ckpt_name: str) -> None:
@@ -394,7 +391,8 @@ class AgentModule(BaseAgentModule):
             self._q_target_nets[i].load_state_dict(self._q_nets[i].state_dict())
         # self._p_target_net = self._net_modules.p_net_factory().to(device)
         # self._p_target_net.load_state_dict(self._p_net.state_dict())
-        self._p_target_net = copy.deepcopy(self._p_net)
+        self._p_target_net = self._net_modules.p_net_factory().to(device)
+        self._p_target_net.load_state_dict(self._p_net.state_dict())
         # if automatic_entropy_tuning:
         #     self._log_alpha_net = self._net_modules.log_alpha_net_factory().to(device)
         
