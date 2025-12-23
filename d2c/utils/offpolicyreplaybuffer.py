@@ -3,7 +3,8 @@ from __future__ import annotations
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Generator
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Dict
+from collections import OrderedDict
 
 import numpy as np
 import torch as th
@@ -33,6 +34,15 @@ class ReplayBufferSamples(NamedTuple):
     next_observations: th.Tensor
     dones: th.Tensor
     rewards: th.Tensor
+    def _samples_to_dict(self) -> Dict:
+        return OrderedDict(
+            s1=self.observations.float(),
+            a1=self.actions,
+            s2=self.next_observations.float(),
+            done=self.dones,
+            reward=self.rewards,
+        )
+
 
 
 def get_action_dim(action_space: spaces.Space) -> int:

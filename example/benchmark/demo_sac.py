@@ -26,6 +26,7 @@ from dataclasses import dataclass
 @dataclass
 class Args:
     env_name: str = 'HalfCheetah-v2'
+    wandb_mode: str = 'online'
 
 def main(args: Args):
     seed = np.random.randint(0, 100) 
@@ -55,7 +56,7 @@ def main(args: Args):
         'project': 'test',
         'name': command_args['env.external.env_name']+'_seed='+str(command_args['train.seed'])+'_'+nowTime,
         'reinit': False,
-        'mode': 'online'
+        'mode': args.wandb_mode
     }
     command_args.update({'train.wandb': wandb})
 

@@ -146,15 +146,10 @@ class SACAgent(BaseAgent):
             self._alpha = self._alpha_init_value
     
     def _build_alpha_loss(self, batch: Dict) -> Tuple:
-        # states = batch['s1']
-        # actions = batch['a1']
-        # rewards = batch['reward']
-        # next_states = batch['s2']
-        # dsc = batch['dsc']
+        states = batch['s1']
 
-        obs = batch.observations.float()
         with torch.no_grad():
-            _, log_pi, _ = self._p_fn(obs)
+            _, log_pi, _ = self._p_fn(states)
         alpha_loss = (-self._log_alpha_fn.exp() * (log_pi + self._target_entropy)).mean()
         self._alpha = self._log_alpha_fn.exp() * self._alpha_multiplier
 
@@ -167,23 +162,22 @@ class SACAgent(BaseAgent):
             return 0, info
 
     def _build_q_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
-        # states = batch['s1']
-        # actions = batch['a1']
-        # rewards = batch['reward']
-        # next_states = batch['s2']
-        # dsc = batch['dsc']        
+        states = batch['s1']
+        actions = batch['a1']
+        rewards = batch['reward']
+        next_states = batch['s2']
+        dones = batch['done']        
 
         with torch.no_grad():
-            next_obs = batch.next_observations.float()
-            next_state_actions, next_state_log_pi, _ = self._p_fn(next_obs)
-            qf1_next_target = self._q_target_fns[0](next_obs, next_state_actions)
-            qf2_next_target = self._q_target_fns[1](next_obs, next_state_actions)
+            next_state_actions, next_state_log_pi, _ = self._p_fn(next_states)
+            qf1_next_target = self._q_target_fns[0](next_states, next_state_actions)
+            qf2_next_target = self._q_target_fns[1](next_states, next_state_actions)
             min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._log_alpha_fn.exp() * next_state_log_pi
-            next_q_value = batch.rewards.flatten() + (1 - batch.dones.flatten()) * self._discount * (min_qf_next_target).view(-1)
+            next_q_value = rewards.flatten() + (1 - dones.flatten()) * self._discount * (min_qf_next_target).view(-1)
 
-        obs = batch.observations.float()
-        qf1_a_values = self._q_fns[0](obs, batch.actions).view(-1)
-        qf2_a_values = self._q_fns[1](obs, batch.actions).view(-1)
+
+        qf1_a_values = self._q_fns[0](states, actions).view(-1)
+        qf2_a_values = self._q_fns[1](states, actions).view(-1)
         qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
         qf2_loss = F.mse_loss(qf2_a_values, next_q_value)
         qf_loss = qf1_loss + qf2_loss
@@ -199,16 +193,11 @@ class SACAgent(BaseAgent):
         return qf_loss, info
     
     def _build_p_loss(self, batch: Dict) -> Tuple[Tensor, Dict]:
-        # states = batch['s1']
-        # actions = batch['a1']
-        # rewards = batch['reward']
-        # next_states = batch['s2']
-        # dsc = batch['dsc']
+        states = batch['s1']
 
-        obs = batch.observations.float()
-        pi, log_pi, _ = self._p_fn(obs)
-        qf1_pi = self._q_fns[0](obs, pi)
-        qf2_pi = self._q_fns[1](obs, pi)
+        pi, log_pi, _ = self._p_fn(states)
+        qf1_pi = self._q_fns[0](states, pi)
+        qf2_pi = self._q_fns[1](states, pi)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
         p_loss = ((self._log_alpha_fn.exp() * log_pi) - min_qf_pi).mean()
 
@@ -238,6 +227,7 @@ class SACAgent(BaseAgent):
 
         if self._global_step > self._learning_starts:
             batch = self._train_data.sample(self._batch_size)
+            batch = batch._samples_to_dict()
 
         return batch
 
