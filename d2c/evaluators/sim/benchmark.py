@@ -333,7 +333,7 @@ class OffPolicyBMEval(BaseEval):
                 done = False
                 for _step in range(self._n_eval_episodes_max_step):
                     observation = torch.Tensor(observation).to(self._agent._device)
-                    action, _, _ = policy.get_action(observation)
+                    action, _, _ = policy(observation)
                     observation, reward, termination, truncation, infos = self._env.step(action.cpu().numpy())
                     done = np.logical_or(termination, truncation)
                     if "final_info" in infos:

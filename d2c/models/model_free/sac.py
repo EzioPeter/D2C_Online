@@ -154,7 +154,7 @@ class SACAgent(BaseAgent):
 
         obs = batch.observations.float()
         with torch.no_grad():
-            _, log_pi, _ = self._p_fn.get_action(obs)
+            _, log_pi, _ = self._p_fn(obs)
         alpha_loss = (-self._log_alpha_fn.exp() * (log_pi + self._target_entropy)).mean()
         self._alpha = self._log_alpha_fn.exp() * self._alpha_multiplier
 
@@ -175,7 +175,7 @@ class SACAgent(BaseAgent):
 
         with torch.no_grad():
             next_obs = batch.next_observations.float()
-            next_state_actions, next_state_log_pi, _ = self._p_fn.get_action(next_obs)
+            next_state_actions, next_state_log_pi, _ = self._p_fn(next_obs)
             qf1_next_target = self._q_target_fns[0](next_obs, next_state_actions)
             qf2_next_target = self._q_target_fns[1](next_obs, next_state_actions)
             min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self._log_alpha_fn.exp() * next_state_log_pi
@@ -206,7 +206,7 @@ class SACAgent(BaseAgent):
         # dsc = batch['dsc']
 
         obs = batch.observations.float()
-        pi, log_pi, _ = self._p_fn.get_action(obs)
+        pi, log_pi, _ = self._p_fn(obs)
         qf1_pi = self._q_fns[0](obs, pi)
         qf2_pi = self._q_fns[1](obs, pi)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
@@ -222,7 +222,7 @@ class SACAgent(BaseAgent):
         if self._global_step < self._learning_starts:
             actions = np.array([self._action_space.sample() for _ in range(self._num_envs)])
         else:
-            actions, _, _ = self._p_fn.get_action(torch.Tensor(obs).to(self._device))
+            actions, _, _ = self._p_fn(torch.Tensor(obs).to(self._device))
             actions = actions.detach().cpu().numpy()
         next_obs, rewards, terminations, truncations, infos = self._env.step(actions)
 
