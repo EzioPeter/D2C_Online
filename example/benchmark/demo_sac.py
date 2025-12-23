@@ -43,7 +43,7 @@ def main(args: Args):
         'model.model_name': 'sac',
         'train.data_loader_name': None,
         'train.device': device,
-        'train.seed': 1,
+        'train.seed': seed,
         'train.total_train_steps': 1000000,
         'train.batch_size': 256,
         'train.agent_ckpt_name': '1211'
@@ -55,7 +55,7 @@ def main(args: Args):
         'project': 'test',
         'name': command_args['env.external.env_name']+'_seed='+str(command_args['train.seed'])+'_'+nowTime,
         'reinit': False,
-        'mode': 'offline'
+        'mode': 'online'
     }
     command_args.update({'train.wandb': wandb})
 
