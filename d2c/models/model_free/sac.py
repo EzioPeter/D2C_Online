@@ -262,11 +262,6 @@ class SACAgent(BaseAgent):
             actions = actions.detach().cpu().numpy()
         next_obs, rewards, terminations, truncations, infos = self._env.step(actions)
 
-        if "final_info" in infos:
-            for info in infos["final_info"]:
-                if info is not None:
-                    print(f"global_step={self._global_step}, episodic_return={info['episode']['r']}")
-
         real_next_obs = next_obs.copy()
         for idx, trunc in enumerate(truncations):
             if trunc:

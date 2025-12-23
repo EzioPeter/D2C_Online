@@ -7,7 +7,7 @@ from d2c.trainers import OffPolicyTrainer as Trainer
 from d2c.models import make_agent
 from d2c.envs import benchmark_env, LeaEnv
 from d2c.data import Data
-from d2c.evaluators import bm_eval
+from d2c.evaluators import bm_eval, offpolicy_bm_eval
 # from d2c.utils.utils import update_source_env_gravity, update_source_env_friction, update_source_env_density, update_source_env_short_thigh, update_source_env_thigh_range, update_source_env_torso_length
 from example.benchmark.config import make_config
 
@@ -106,7 +106,7 @@ def main(args: Args):
     # agent with an empty buffer
     agent = make_agent(config=config, env=env, data=None)
     # envaluate in the real env
-    evaluator = bm_eval(agent=agent, env=env, config=config)
+    evaluator = offpolicy_bm_eval(agent=agent, env=env, config=config)
     # train in the sim env
     trainer = Trainer(agent=agent, train_data=None, config=config, env=env, evaluator=evaluator)
     trainer.train()
