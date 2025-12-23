@@ -114,10 +114,6 @@ class ActorNetwork(nn.Module):
         log_std = torch.tanh(log_std)
         log_std = LOG_STD_MIN + 0.5 * (LOG_STD_MAX - LOG_STD_MIN) * (log_std + 1)  # From SpinUp / Denis Yarats
 
-    #     return mean, log_std
-
-    # def get_action(self, x):
-    #     mean, log_std = self(x)
         std = log_std.exp()
         normal = torch.distributions.Normal(mean, std)
         x_t = normal.rsample()  # for reparameterization trick (mean + std * N(0,1))
