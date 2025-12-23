@@ -77,10 +77,10 @@ class OffPolicyTrainer(BaseTrainer):
         while step < self._train_steps:
             self._agent.train_step()
             step = self._agent.global_step
-            # if step % self._summary_freq == 0 or step == self._train_steps:
-            #     self._agent.write_train_summary(train_summary_writer)
-            # if step % self._print_freq == 0 or step == self._train_steps:
-            #     self._agent.print_train_info()
+            if step % self._summary_freq == 0 or step == self._train_steps:
+                self._agent.write_train_summary(train_summary_writer)
+            if step % self._print_freq == 0 or step == self._train_steps:
+                self._agent.print_train_info()
             # if step % self._eval_freq == 0 or step == self._train_steps:
             #     if self._evaluator is not None:
             #         try:
@@ -96,7 +96,7 @@ class OffPolicyTrainer(BaseTrainer):
             #     self._agent.save(agent_ckpt_dir)
             #     logging.info(f'Agent saved at {agent_ckpt_dir}.')
         # self._agent.save(agent_ckpt_dir)
-        # train_summary_writer.close()
+        train_summary_writer.close()
         wandb_logger.finish()
         time_cost = time.time() - time_st_total
         logging.info('Training finished, time cost %.4gs.', time_cost)
