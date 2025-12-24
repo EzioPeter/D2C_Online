@@ -6,6 +6,14 @@
 example/benchmark/data/d4rl/datasets/
 !/example/benchmark/data/*/*/*.py
 /example/benchmark/models/*
+/sim2sim/application*/data/*
+/sim2sim/application*/models/*
+/sim2sim/benchmark/data/*/*/*
+/sim2sim/benchmark/data/neorl/*
+/sim2sim/benchmark/data/isaac_gym/*
+sim2sim/benchmark/data/d4rl/datasets/
+!/sim2sim/benchmark/data/*/*/*.py
+/sim2sim/benchmark/models/*
 __pycache__
 .idea
 .vscode
