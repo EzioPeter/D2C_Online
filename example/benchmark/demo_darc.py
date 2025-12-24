@@ -60,7 +60,7 @@ def main(args: Args):
         prefix + 'variety_degree': args.variety_degree,
     })
     wandb = {
-        'project': 'state revisit and re-explore',
+        'project': 'test',
         'name': command_args['env.external.data_name']+'_'+command_args['env.external.unreal_dynamics']+'x'+str(command_args['env.external.variety_degree'])+'_seed='+str(command_args['train.seed'])+'_'+nowTime,
         'reinit': False,
         'mode': 'online'
