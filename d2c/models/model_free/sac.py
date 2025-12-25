@@ -3,18 +3,13 @@ Implementation of SAC (Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinfo
 Paper: https://arxiv.org/abs/1801.01290.pdf
 """
 import collections
-
-import copy
-from ml_collections import ConfigDict
-
 import torch
-from tqdm import trange
 import numpy as np
 import torch.nn.functional as F
 from torch import nn, Tensor
-from typing import Union, Tuple, Any, Sequence, Dict, Iterator
+from typing import Tuple, Any, Dict
 from d2c.models.base import BaseAgent, BaseAgentModule
-from d2c.utils import networks, utils, policies
+from d2c.utils import utils
 from d2c.utils.offpolicyreplaybuffer import ReplayBuffer
 from d2c.networks_and_utils_for_agent.sac_nets_utils import ActorNetwork, CriticNetwork
 
