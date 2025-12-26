@@ -620,10 +620,14 @@ class H2OAgent(BaseAgent):
         self._test_policies['main'] = self._p_fn
     
     def save(self, ckpt_name: str) -> None:
-        pass
+        torch.save(self._agent_module.state_dict(), ckpt_name + '_agent_module.pth')
+        torch.save(self._agent_module.q_nets.state_dict(), ckpt_name + '_q_nets.pth')
+        torch.save(self._agent_module.p_net.state_dict(), ckpt_name + '_p_net.pth')
+        torch.save(self._agent_module.dsa_net.state_dict(), ckpt_name + '_dsa.pth')
+        torch.save(self._agent_module.dsas_net.state_dict(), ckpt_name + '_dsas.pth')
 
     def restore(self, ckpt_name: str) -> None:
-        pass
+        self._agent_module.load_state_dict(torch.load(ckpt_name + '_agent_module.pth'))
 
 
 class AgentModule(BaseAgentModule):
