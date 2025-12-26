@@ -51,7 +51,7 @@ def main(args: Args):
         'train.seed': seed,
         'train.total_train_steps': 1000000,
         'train.batch_size': 256,
-        'train.agent_ckpt_name': '1211'
+        'train.agent_ckpt_name': '1225'
     })
     command_args.update({
         prefix + 'env_name': args.env_name,
