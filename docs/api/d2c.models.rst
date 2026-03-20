@@ -27,6 +27,14 @@ BaseAgentModule
 Model-free
 ------------------
 
+CQLAgent
+~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: d2c.models.CQLAgent
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 DOGEAgent
 ~~~~~~~~~~~~~~~~~~
 
@@ -103,5 +111,4 @@ make_agent
 ~~~~~~~~~~~~~~~~~~
 
 .. autofunction:: d2c.models.make_agent
-
 

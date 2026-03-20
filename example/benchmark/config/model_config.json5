@@ -20,6 +20,26 @@
         optimizers: {q: ['adam', 3e-4], p: ['adam', 3e-4]}
       }
     },
+    cql: {
+      train_schedule: ['agent'],
+      hyper_params: {
+        model_params: {q: [[256, 256], 2], p: [[256, 256],]},
+        optimizers: {q: ['adam', 3e-4], p: ['adam', 1e-4], alpha: ['adam', 3e-4]},
+        alpha_multiplier: 1.0,
+        alpha_init_value: 0.2,
+        automatic_entropy_tuning: true,
+        backup_entropy: false,
+        target_update_period: 1,
+        update_actor_freq: 2,
+        cql_n_actions: 10,
+        cql_temp: 1.0,
+        cql_alpha: 5.0,
+        cql_q_next_with_next_states: true,
+        policy_bc_steps: 5000,
+        actor_bc_weight: 1.0,
+        grad_clip_norm: 10.0,
+      }
+    },
     doge: {
       train_schedule: ['agent'],
       hyper_params: {

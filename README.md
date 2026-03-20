@@ -10,6 +10,7 @@ D2C(**D**ata-**d**riven **C**ontrol Library) is a library for data-driven decisi
 The current supported offline RL/IL algorithms include (**more to come**):
 
 - [Twin Delayed DDPG with Behavior Cloning (TD3+BC)](https://arxiv.org/pdf/2106.06860.pdf)
+- [Conservative Q-Learning (CQL)](https://arxiv.org/abs/2006.04779)
 - [Distance-Sensitive Offline Reinforcement Learning (DOGE)](https://arxiv.org/abs/2205.11027.pdf)
 - [Dynamics-Aware Hybrid Offline-and-Online Reinforcement Learning (H2O)](https://arxiv.org/abs/2206.13464.pdf)
 - [Sparse Q-learning (SQL)](https://arxiv.org/abs/2303.15810)
