@@ -27,6 +27,14 @@ BaseAgentModule
 Model-free
 ------------------
 
+CQLAgent
+~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: d2c.models.CQLAgent
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 DOGEAgent
 ~~~~~~~~~~~~~~~~~~
 
@@ -65,6 +73,13 @@ TD3BCAgent
 Model-based
 ------------------
 
+MBPOAgent
+~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: d2c.models.MBPOAgent
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 
 Imitation
@@ -103,5 +118,3 @@ make_agent
 ~~~~~~~~~~~~~~~~~~
 
 .. autofunction:: d2c.models.make_agent
-
-

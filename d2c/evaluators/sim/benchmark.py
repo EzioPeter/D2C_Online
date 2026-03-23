@@ -61,12 +61,18 @@ class BMEval(BaseEval):
     def _eval_policy_episodes(self, policy: nn.Module) -> Tuple[float, float, np.ndarray]:
         results = []
         for i in range(self._n_episodes):
-            observation = self._env.reset()
-            done = None
+            reset_result = self._env.reset()
+            observation = reset_result[0] if isinstance(reset_result, tuple) else reset_result
+            done = False
             total_rewards = 0.0
             for _step in range(self._n_episodes_max_step):
                 action = policy(observation)
-                observation, reward, done, _ = self._env.step(action)
+                step_result = self._env.step(action)
+                if len(step_result) == 5:
+                    observation, reward, terminated, truncated, _ = step_result
+                    done = terminated or truncated
+                else:
+                    observation, reward, done, _ = step_result
                 total_rewards += reward
                 if done:
                     break
@@ -131,7 +137,7 @@ class BMEval(BaseEval):
 
         Call it when agent training finished.
         """
-        eval_r_results = np.array(self._eval_r_results)
+        eval_r_results = np.array(self._eval_r_results, dtype=object)
         results_file = os.path.join(self._eval_summary_dir, 'results_reward.npy')
         np.save(results_file, eval_r_results)
         logging.info(f'The results have been saved in {results_file}.')
@@ -264,7 +270,7 @@ class OnPolicyBMEval(BaseEval):
 
         Call it when agent training finished.
         """
-        eval_r_results = np.array(self._eval_r_results)
+        eval_r_results = np.array(self._eval_r_results, dtype=object)
         results_file = os.path.join(self._eval_summary_dir, 'results_reward.npy')
         np.save(results_file, eval_r_results)
         logging.info(f'The results have been saved in {results_file}.')
@@ -339,7 +345,10 @@ class OffPolicyBMEval(BaseEval):
                     if "final_info" in infos:
                         for info in infos["final_info"]:
                             if info and "episode" in info:
-                                results.append(infos["final_info"]["episode"]["r"])
+                                episode_reward = info["episode"]["r"]
+                                if isinstance(episode_reward, np.ndarray):
+                                    episode_reward = float(np.asarray(episode_reward).reshape(-1)[0])
+                                results.append(float(episode_reward))
                     if done:
                         break
             logging.info('='*20+f' Complete evaluation of {self._n_eval_episodes} episodes! '+'='*20)
@@ -402,7 +411,7 @@ class OffPolicyBMEval(BaseEval):
 
         Call it when agent training finished.
         """
-        eval_r_results = np.array(self._eval_r_results)
+        eval_r_results = np.array(self._eval_r_results, dtype=object)
         results_file = os.path.join(self._eval_summary_dir, 'results_reward.npy')
         np.save(results_file, eval_r_results)
         logging.info(f'The results have been saved in {results_file}.')

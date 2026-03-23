@@ -158,7 +158,7 @@ class ReplayBuffer:
         for k, v in self._data.items():
             v[indices] = transitions[k]
         # Update the _ptr and _size.
-        self._ptr = indices[-1]
+        self._ptr = int((indices[-1].item() + 1) % self._max_size)
         self._size = min(self._size + batch_size, self._max_size)
 
     @property
@@ -183,4 +183,3 @@ class ReplayBuffer:
             assert self._size > 0, 'There is no data in buffer!'
             self._shuffle_indices = np.random.permutation(self._size)
         return self._shuffle_indices
-

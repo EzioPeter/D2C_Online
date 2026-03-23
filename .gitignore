@@ -24,6 +24,7 @@ __pycache__
 /test/trainers/temp/*
 example/benchmark/nohup.out
 bak/
+temp/
 
 # Sphinx documentation
 docs/_build/
