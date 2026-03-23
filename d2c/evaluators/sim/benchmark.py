@@ -345,10 +345,7 @@ class OffPolicyBMEval(BaseEval):
                     if "final_info" in infos:
                         for info in infos["final_info"]:
                             if info and "episode" in info:
-                                episode_reward = info["episode"]["r"]
-                                if isinstance(episode_reward, np.ndarray):
-                                    episode_reward = float(np.asarray(episode_reward).reshape(-1)[0])
-                                results.append(float(episode_reward))
+                                results.append(infos["final_info"]["episode"]["r"])
                     if done:
                         break
             logging.info('='*20+f' Complete evaluation of {self._n_eval_episodes} episodes! '+'='*20)
