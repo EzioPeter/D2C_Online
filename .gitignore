@@ -22,6 +22,7 @@ __pycache__
 /test/evaluators/*/temp/*
 /test/models/model_free/temp/*
 /test/trainers/temp/*
+.pytest_cache/
 example/benchmark/nohup.out
 bak/
 temp/
