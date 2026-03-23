@@ -26,7 +26,5 @@ setup(
         'fire',
         'tyro',
         'ml_collections==0.1.1',
-        'Cython==0.29.33',
-        'mujoco-py==2.1.2.14',
     ],
 )
