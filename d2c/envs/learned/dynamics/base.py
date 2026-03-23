@@ -165,7 +165,9 @@ class BaseDyna(ABC):
 
         :param str ckpt_name: the file path of the model saved.
         """
-        self._dyna_module.load_state_dict(torch.load(ckpt_name + '.pth'))
+        self._dyna_module.load_state_dict(
+            torch.load(ckpt_name + '.pth', map_location=self._device, weights_only=True)
+        )
 
     @property
     def global_step(self) -> int:

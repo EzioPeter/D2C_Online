@@ -4,6 +4,7 @@ from d2c.envs import BaseEnv
 from d2c.utils import utils
 from d2c.utils.replaybuffer import ReplayBuffer
 from d2c.models.base import BaseAgent
+from d2c.models.model_based.mbpo import MBPOAgent
 from d2c.models.model_free.td3_bc import TD3BCAgent
 from d2c.models.model_free.cql import CQLAgent
 from d2c.models.model_free.doge import DOGEAgent
@@ -16,6 +17,7 @@ from d2c.models.model_free.sac import SACAgent
 from d2c.models.model_free.ppo import PPOAgent
 
 AGENT_MODULES_DICT = {
+    'mbpo': MBPOAgent,
     'td3_bc': TD3BCAgent,
     'cql': CQLAgent,
     'doge': DOGEAgent,
@@ -46,7 +48,7 @@ def get_agent(model_name: str) -> Callable[..., BaseAgent]:
         +------------------+------------------------------------------------+
         |  Model-free RL   |  'td3_bc', 'cql', 'doge', 'h2o', 'iql'         |
         +------------------+------------------------------------------------+
-        |  Model-based RL  |                                                |
+        |  Model-based RL  |  'mbpo'                                        |
         +------------------+------------------------------------------------+
     """
     return AGENT_MODULES_DICT[model_name]
@@ -104,6 +106,8 @@ def make_agent(
         device=model_cfg.train.device,
     )
     agent_args.update(agent_config.hyper_params)
+    if model_name == 'mbpo':
+        agent_args.update(config=config)
 
     agent = get_agent(model_name)(**agent_args)
     if restore_agent:

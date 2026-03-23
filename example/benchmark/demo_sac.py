@@ -22,7 +22,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Args:
-    env_name: str = 'HalfCheetah-v5'
+    env_name: str = 'HalfCheetah-v2'
     wandb_mode: str = 'online'
 
 def main(args: Args):
