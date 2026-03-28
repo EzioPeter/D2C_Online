@@ -26,7 +26,7 @@ now_time = datetime.datetime.now().strftime('%y-%m-%d-%H-%M-%S')
 @dataclass
 class Args:
     env_name: str = 'HalfCheetah-v5'
-    total_train_steps: int = 1_000_000
+    total_train_steps: int = 400_000
     seed: int = 1
     agent_ckpt_name: str = 'mbpo-online'
     wandb_mode: str = 'online'
